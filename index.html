@@ -1,0 +1,91 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>海釣り - ブラウザで遊べる釣りゲーム</title>
+<meta name="description" content="深く投げるほど大きな魚。でも引き上げるのは難しい。全5投で合計スコアを競う、ブラウザで遊べる釣りゲーム「海釣り」。">
+<style>
+  :root {
+    --bg: #0b2a4a; --bg2: #123f6b; --card: rgba(255,255,255,0.08);
+    --text: #eaf4ff; --sub: #b9d6f2; --accent: #ffe27a; --btn: #ffffff; --btn-text: #0b4a8a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; color: var(--text); line-height: 1.8;
+    font-family: "Hiragino Sans", "Meiryo", "Yu Gothic", sans-serif;
+    background: linear-gradient(180deg, var(--bg2) 0%, var(--bg) 60%, #06182b 100%);
+    min-height: 100vh;
+  }
+  main { max-width: 860px; margin: 0 auto; padding: 0 16px 56px; }
+  header { text-align: center; padding: 64px 0 36px; }
+  h1 { margin: 0; font-size: clamp(40px, 10vw, 72px); letter-spacing: 0.25em; text-indent: 0.25em; }
+  .lead { margin: 14px 0 0; color: var(--sub); font-size: clamp(15px, 3vw, 19px); }
+  .cta {
+    display: inline-block; margin-top: 28px; padding: 14px 48px; border-radius: 999px;
+    background: var(--btn); color: var(--btn-text); font-size: 20px; font-weight: bold; text-decoration: none;
+    box-shadow: 0 4px 0 #8fc4f0; transition: transform .08s, box-shadow .08s;
+  }
+  .cta:hover { transform: translateY(1px); box-shadow: 0 3px 0 #8fc4f0; }
+  section { margin-top: 44px; }
+  h2 { margin: 0 0 14px; font-size: clamp(20px, 4vw, 26px); letter-spacing: 0.15em; color: var(--accent); }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .card { background: var(--card); border-radius: 12px; padding: 16px 18px; }
+  .card h3 { margin: 0 0 6px; font-size: 17px; }
+  .card p { margin: 0; color: var(--sub); font-size: 15px; }
+  ol.steps { margin: 0; padding-left: 1.4em; }
+  ol.steps li { margin-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; }
+  th, td { padding: 10px 14px; text-align: left; font-size: 15px; }
+  th { background: rgba(255,255,255,0.12); }
+  tr + tr td { border-top: 1px solid rgba(255,255,255,0.1); }
+  .gold { color: var(--accent); font-weight: bold; }
+  footer { text-align: center; margin-top: 56px; color: var(--sub); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>海 釣 り</h1>
+    <p class="lead">より大きな魚を釣ろう！<br>深く投げるほど大物がいる。でも、引き上げるのは難しくなる。</p>
+    <a class="cta" href="game/umitsuri.html">ゲームをはじめる</a>
+  </header>
+
+  <section>
+    <h2>遊び方</h2>
+    <div class="card">
+      <ol class="steps">
+        <li>画面をクリックして、投げる準備をします。</li>
+        <li>ゲージが動くので、狙う深さ（右ほど深い）でクリックして仕掛けを投げます。</li>
+        <li>魚がヒットしたら、ゲージの<strong>緑のゾーン</strong>でクリックして引き上げます。</li>
+        <li>これを全部で<strong>5投</strong>くり返し、合計スコアを伸ばします。</li>
+      </ol>
+      <p style="margin-top:10px">スマホ・パソコンどちらでも、ブラウザだけで遊べます。BGMは画面上のボタン、またはMキーでオン／オフできます。</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>ゲームの特徴</h2>
+    <div class="grid">
+      <div class="card"><h3>深さで変わる大きさ</h3><p>浅いと小さな魚、深いと大きな魚。大物ほど緑のゾーンが狭く、動きも速くなります。</p></div>
+      <div class="card"><h3>全93種の魚図鑑</h3><p>釣った魚は図鑑に記録。カードをクリックすると、魚のくわしい説明が読めます。</p></div>
+      <div class="card"><h3>幻の「黄金の魚」</h3><p>深場で低確率で出現。釣れれば100点、さらに最高ランクの称号が待っています。</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>スコアとランク</h2>
+    <table>
+      <tr><th>サイズ</th><th>深さ</th><th>得点</th></tr>
+      <tr><td>小</td><td>浅い</td><td>5点</td></tr>
+      <tr><td>中</td><td>中くらい</td><td>10点</td></tr>
+      <tr><td>大</td><td>深い</td><td>15点</td></tr>
+      <tr><td class="gold">黄金の魚</td><td>深場（まれに出現）</td><td class="gold">100点</td></tr>
+    </table>
+    <p style="color:var(--sub);font-size:14px">合計点でランクが決まります：20点〜 釣り人見習い ／ 40点〜 釣り上手 ／ 60点〜 釣り名人 ／ 黄金の魚を釣ると <span class="gold">★伝説の釣り人★</span></p>
+  </section>
+
+  <footer>図鑑の記録はお使いの端末のブラウザ内にのみ保存されます。</footer>
+</main>
+</body>
+</html>
