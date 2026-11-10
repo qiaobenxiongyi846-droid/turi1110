@@ -1,0 +1,2114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>海釣り</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #0b2a4a; font-family: "Hiragino Sans", "Meiryo", "Yu Gothic", sans-serif;
+    user-select: none; -webkit-user-select: none;
+  }
+  #wrap { position: relative; width: 800px; max-width: 100vw; aspect-ratio: 800 / 520; }
+  canvas { width: 100%; height: 100%; display: block; border-radius: 10px; cursor: pointer; background: #cfe9ff; }
+  .overlay {
+    position: absolute; inset: 0; border-radius: 10px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    background: rgba(10, 50, 100, 0.82); color: #fff; text-align: center;
+  }
+  .overlay.hidden { display: none; }
+  .overlay h1 { margin: 0; font-size: clamp(32px, 7vw, 56px); letter-spacing: 0.15em; }
+  .overlay p { margin: 0; font-size: clamp(13px, 2.2vw, 17px); line-height: 1.8; color: #d6ebff; }
+  .overlay button {
+    margin-top: 8px; padding: 12px 44px; font-size: 20px; font-weight: bold; color: #0b4a8a;
+    background: #fff; border: none; border-radius: 999px; cursor: pointer;
+    box-shadow: 0 4px 0 #8fc4f0; transition: transform .08s, box-shadow .08s;
+  }
+  .overlay button:active { transform: translateY(3px); box-shadow: 0 1px 0 #8fc4f0; }
+  .big { font-size: clamp(40px, 9vw, 72px); font-weight: bold; }
+  .rank { font-size: clamp(18px, 3.5vw, 26px); color: #ffe27a; font-weight: bold; }
+  .row { display: flex; gap: 14px; align-items: center; justify-content: center; }
+  .overlay button.sub {
+    background: transparent; color: #fff; border: 2px solid #fff; box-shadow: none; padding: 10px 30px;
+  }
+  .overlay button.sub:active { transform: translateY(2px); }
+
+  /* BGMのオン・オフ */
+  .mute {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 10;
+    width: 38px; height: 38px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(8, 40, 90, 0.6); color: #fff; font-size: 17px; line-height: 38px; padding: 0;
+  }
+  .mute:hover { background: rgba(8, 40, 90, 0.85); }
+
+  /* 図鑑 */
+  .zukan {
+    position: absolute; inset: 0; border-radius: 10px; padding: 14px 16px; z-index: 5;
+    display: flex; flex-direction: column; gap: 10px;
+    background: rgba(8, 36, 78, 0.97); color: #fff;
+  }
+  .zukan.hidden { display: none; }
+  .zhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .zhead h2 { margin: 0; font-size: clamp(20px, 4vw, 28px); letter-spacing: 0.2em; }
+  .zcount { font-size: clamp(14px, 2.6vw, 18px); color: #ffe27a; font-weight: bold; }
+  .ztabs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ztabs button {
+    padding: 6px 16px; font-size: 14px; font-weight: bold; color: #fff; cursor: pointer;
+    background: rgba(255,255,255,0.12); border: 2px solid transparent; border-radius: 999px;
+  }
+  .ztabs button.active { background: #fff; color: #0b4a8a; }
+  .zgrid {
+    flex: 1; overflow-y: auto; display: grid; gap: 8px; align-content: start; padding-right: 4px;
+    grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  }
+  .zcard {
+    background: rgba(255,255,255,0.09); border-radius: 10px; padding: 6px 4px 8px; text-align: center;
+    font-size: 12px; line-height: 1.4;
+  }
+  .zcard canvas { width: 100%; height: auto; display: block; }
+  .zcard.got { background: rgba(255,255,255,0.18); }
+  .zcard.rare.got { background: rgba(255,210,58,0.28); box-shadow: 0 0 0 2px #ffd23a inset; }
+  .zcard .zn { font-weight: bold; font-size: 13px; }
+  .zcard .zc { color: #ffe27a; }
+  .zcard.none { color: #86a6cc; }
+  .zhint { font-size: 12px; color: #9fbbe0; margin-top: -4px; }
+  .zcard { cursor: pointer; transition: transform .08s; }
+  .zcard:hover { transform: translateY(-2px); }
+  .zdetail {
+    position: absolute; inset: 0; border-radius: 10px; z-index: 6; padding: 18px 24px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    background: #082450; color: #fff; text-align: center;
+  }
+  .zdetail.hidden { display: none; }
+  .zdetail canvas { width: min(300px, 70%); height: auto; background: rgba(255,255,255,0.1); border-radius: 12px; }
+  .zdetail.rare canvas { background: rgba(255,210,58,0.22); box-shadow: 0 0 0 2px #ffd23a inset; }
+  #zdName { font-size: clamp(24px, 5vw, 34px); font-weight: bold; letter-spacing: 0.1em; }
+  #zdTags { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  #zdTags span { background: rgba(255,255,255,0.16); border-radius: 999px; padding: 3px 12px; font-size: 13px; }
+  #zdText { margin: 0; max-width: 520px; font-size: clamp(14px, 2.4vw, 17px); line-height: 1.9; color: #e2f0ff; }
+  .zdetail button {
+    margin-top: 6px; padding: 8px 34px; font-size: 16px; font-weight: bold; cursor: pointer;
+    border: none; border-radius: 999px; background: #fff; color: #0b4a8a;
+  }
+  .zfoot { display: flex; justify-content: space-between; align-items: center; }
+  .zfoot button {
+    padding: 8px 28px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 999px;
+    border: none; background: #fff; color: #0b4a8a;
+  }
+  .zfoot button.reset { background: transparent; color: #9fbbe0; font-size: 12px; font-weight: normal; padding: 4px 8px; text-decoration: underline; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="c" width="800" height="520"></canvas>
+  <button id="muteBtn" class="mute" title="BGM オン／オフ（Mキー）" aria-label="BGM オン／オフ">🔊</button>
+
+  <div id="startScreen" class="overlay">
+    <h1>海 釣 り</h1>
+    <p>より大きな魚を釣ろう！<br>深く投げるほど大きな魚がいるけれど、引き上げるのは難しくなる。<br>全部で5投。合計スコアを伸ばそう。</p>
+    <p style="font-size:13px">大 = 15点 ／ 中 = 10点 ／ 小 = 5点<br>どの深さにも、たまに「幻の魚」が現れる…？（100点）</p>
+    <div class="row">
+      <button id="startBtn">スタート</button>
+      <button id="zukanBtn1" class="sub">図鑑</button>
+    </div>
+  </div>
+
+  <div id="resultScreen" class="overlay hidden">
+    <h1 style="font-size:clamp(24px,5vw,38px)">結 果</h1>
+    <div class="big"><span id="finalScore">0</span><span style="font-size:.4em"> 点</span></div>
+    <div class="rank" id="rankText"></div>
+    <p id="detailText"></p>
+    <div class="row">
+      <button id="retryBtn">もう一度</button>
+      <button id="zukanBtn2" class="sub">図鑑</button>
+    </div>
+  </div>
+
+  <div id="zukanScreen" class="zukan hidden">
+    <div class="zhead">
+      <h2>魚 図 鑑</h2>
+      <div class="zcount">登録 <span id="zukanCount">0 / 0</span></div>
+    </div>
+    <div class="ztabs" id="zukanTabs"></div>
+    <div class="zhint">魚のカードをクリックすると、くわしい説明が見られます</div>
+    <div class="zgrid" id="zukanGrid"></div>
+    <div class="zfoot">
+      <button id="zukanReset" class="reset">図鑑の記録を消す</button>
+      <button id="zukanClose">閉じる</button>
+    </div>
+
+    <div id="zukanDetail" class="zdetail hidden">
+      <canvas id="zdCanvas" width="300" height="180"></canvas>
+      <div id="zdName"></div>
+      <div id="zdTags"></div>
+      <p id="zdText"></p>
+      <button id="zdBack">もどる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const cv = document.getElementById('c');
+  let ctx = cv.getContext('2d'); // 図鑑カードに描くときだけ一時的に差し替える
+  const W = 800, H = 520, WATER = 190;
+  const MAX_CASTS = 5;
+  const HOOK_X = 420;
+  const DEPTH_TOP = 240, DEPTH_RANGE = 150; // 魚が下のゲージに隠れない範囲に収める
+
+  // 魚の種類（大きさごとの設定）
+  const FISH = {
+    small:  { label: '小', points: 5,  scale: 0.6, color: '#ffb347', zone: 0.30, speed: 1.0 },
+    medium: { label: '中', points: 10, scale: 1.0, color: '#ff7a8a', zone: 0.20, speed: 1.5 },
+    large:  { label: '大', points: 15, scale: 1.6, color: '#7fd0ff', zone: 0.12, speed: 2.1 },
+  };
+  function sizeFromDepth(d) { return d < 0.40 ? 'small' : d < 0.75 ? 'medium' : 'large'; }
+
+  // 魚の種類（各サイズに3種。点数はサイズで決まる）
+  const SPECIES = {
+    small: [
+      { name: 'イワシ', color: '#9fb8d0', shape: 'slim' },
+      { name: 'アジ',   color: '#7ec8a0', shape: 'slim' },
+      { name: 'フグ',   color: '#e8d27a', shape: 'round' },
+      { name: 'キス',   color: '#f2dcb5', shape: 'slim' },
+      { name: 'サバ',   color: '#5aa0b8', shape: 'slim' },
+      { name: 'メバル', color: '#c8503a', shape: 'spiky' },
+    ],
+    medium: [
+      { name: 'マダイ',   color: '#ff7a8a', shape: 'normal' },
+      { name: 'カサゴ',   color: '#e0603a', shape: 'spiky' },
+      { name: 'カレイ',   color: '#c9a46b', shape: 'flat' },
+      { name: 'スズキ',   color: '#aab8c4', shape: 'normal' },
+      { name: 'ウツボ',   color: '#8a7a4a', shape: 'eel' },
+      { name: 'ヒラメ',   color: '#b89a78', shape: 'flat' },
+    ],
+    large: [
+      { name: 'マグロ', color: '#4a78c8', shape: 'tuna' },
+      { name: 'サメ',   color: '#8a9aa8', shape: 'shark' },
+      { name: 'カジキ', color: '#3a9fd8', shape: 'marlin' },
+      { name: 'ブリ',       color: '#5f9cb5', shape: 'tuna' },
+      { name: 'エイ',       color: '#9a8ab0', shape: 'ray' },
+      { name: 'シュモクザメ', color: '#7a8a98', shape: 'hammer' },
+    ],
+  };
+  // 各サイズ30種になるよう追加（pat: 'stripe'=しま模様 / 'spot'=水玉模様）
+  const add = (kind, rows) => rows.forEach(([name, color, shape, pat]) => SPECIES[kind].push({ name, color, shape, pat }));
+  add('small', [
+    ['サンマ', '#6a8fa8', 'slim'], ['ハゼ', '#b0a070', 'slim', 'spot'], ['シラス', '#e8e8f0', 'slim'],
+    ['カマス', '#c0c8b0', 'slim'], ['サヨリ', '#d0e0e8', 'slim'], ['ボラ', '#8a98a0', 'slim'],
+    ['ニシン', '#7aa0c0', 'slim'], ['イカナゴ', '#d8d0b0', 'slim'], ['ハコフグ', '#f0d040', 'round', 'spot'],
+    ['ミノカサゴ', '#c04040', 'spiky', 'stripe'], ['クマノミ', '#ff8a30', 'normal', 'stripe'], ['ネンブツダイ', '#e0a0a0', 'slim', 'stripe'],
+    ['カワハギ', '#b0b890', 'flat', 'spot'], ['イシモチ', '#c8c8d8', 'normal'], ['ベラ', '#4aa88a', 'normal'],
+    ['スズメダイ', '#3a6ab0', 'round'], ['キンギョハナダイ', '#ff9acb', 'normal'], ['ハタンポ', '#f0c060', 'slim'],
+    ['アイゴ', '#8a9a58', 'normal', 'spot'], ['ギンポ', '#a89070', 'eel'], ['ダツ', '#a0d0c8', 'slim'],
+    ['トビウオ', '#5a90d0', 'slim', 'stripe'], ['チョウチョウウオ', '#ffe060', 'round', 'stripe'], ['ニザダイ', '#6a7a90', 'flat'],
+  ]);
+  add('medium', [
+    ['ブダイ', '#4ab0a0', 'normal', 'spot'], ['イシダイ', '#a8b0b8', 'normal', 'stripe'], ['クロダイ', '#4a5058', 'normal'],
+    ['ホウボウ', '#e07a50', 'spiky', 'spot'], ['アカハタ', '#d05a4a', 'spiky', 'spot'], ['キンメダイ', '#e03a3a', 'normal'],
+    ['アマダイ', '#e8b090', 'normal'], ['ムツ', '#5a4a60', 'normal'], ['イサキ', '#b09060', 'normal', 'stripe'],
+    ['ハマチ', '#6aa8c0', 'tuna'], ['カツオ', '#4a6aa0', 'tuna', 'stripe'], ['サワラ', '#9ab0c8', 'slim'],
+    ['タチウオ', '#c8d0d8', 'eel'], ['アナゴ', '#7a6a58', 'eel'], ['ハモ', '#b8a890', 'eel'],
+    ['メジナ', '#3a5a48', 'normal'], ['ハタ', '#8a6a50', 'spiky', 'spot'], ['マダラ', '#a89a7a', 'normal', 'spot'],
+    ['アイナメ', '#b08a4a', 'spiky', 'spot'], ['ソイ', '#706050', 'spiky'], ['コチ', '#a89870', 'flat', 'spot'],
+    ['オコゼ', '#907060', 'spiky', 'spot'], ['ヘダイ', '#d0d0c0', 'normal'], ['シマアジ', '#98b8a0', 'normal', 'stripe'],
+  ]);
+  add('large', [
+    ['クロマグロ', '#2a4a8a', 'tuna'], ['キハダ', '#d0c040', 'tuna'], ['メバチ', '#5a7aa8', 'tuna'],
+    ['カンパチ', '#78a898', 'tuna', 'stripe'], ['ヒラマサ', '#6aa0a8', 'tuna'], ['バショウカジキ', '#2a60b0', 'marlin'],
+    ['メカジキ', '#6a7a90', 'marlin'], ['マカジキ', '#4a8ac8', 'marlin', 'stripe'], ['ホホジロザメ', '#8a98a8', 'shark'],
+    ['ジンベエザメ', '#5a7090', 'shark', 'spot'], ['ヨシキリザメ', '#4a6aa8', 'shark'], ['トラフザメ', '#c0a860', 'shark', 'spot'],
+    ['ノコギリザメ', '#a09080', 'marlin'], ['マンタ', '#3a4a6a', 'ray'], ['アカエイ', '#b08050', 'ray'],
+    ['トビエイ', '#6a7aa0', 'ray', 'spot'], ['シイラ', '#60c070', 'normal', 'spot'], ['ロウニンアジ', '#7090a0', 'tuna'],
+    ['ターポン', '#c8d0d8', 'normal'], ['オヒョウ', '#7a6a58', 'flat', 'spot'], ['チョウザメ', '#6a6a58', 'shark', 'spot'],
+    ['ウバザメ', '#7a8088', 'shark'], ['リュウグウノツカイ', '#e0e8f0', 'eel'], ['シロカジキ', '#8ab0d0', 'marlin'],
+  ]);
+
+  // 幻の魚：深場（大サイズ域）でのみ低確率で出現。点数・難しさは個別設定
+  const RARES = {
+    small:  { name: '黄金のアジ',   color: '#ffd23a', shape: 'slim',   rare: true, points: 100, zone: 0.07, speed: 2.5 },
+    medium: { name: '黄金のマダイ', color: '#ffd23a', shape: 'normal', rare: true, points: 100, zone: 0.07, speed: 2.5 },
+    large:  { name: '黄金のマグロ', color: '#ffd23a', shape: 'tuna',   rare: true, points: 100, zone: 0.07, speed: 2.5 },
+  };
+  const RARE_RATE = 0.08; // 各深さでの幻の魚の出現率
+  function pickSpecies(kind, allowRare = false) {
+    if (allowRare && Math.random() < RARE_RATE) return RARES[kind];
+    const list = SPECIES[kind];
+    return list[Math.floor(Math.random() * list.length)];
+  }
+  function pointsOf() { return species.points || FISH[fishKind].points; }
+
+  // ---- 図鑑（釣った魚の記録。端末のブラウザに保存） ----
+  const ZUKAN_KEY = 'umitsuri_zukan_v1';
+  let zukan = {}; // { 魚の名前: 釣った匹数 }
+  try { zukan = JSON.parse(localStorage.getItem(ZUKAN_KEY) || '{}') || {}; } catch (e) { zukan = {}; }
+  function saveZukan() { try { localStorage.setItem(ZUKAN_KEY, JSON.stringify(zukan)); } catch (e) {} }
+  let isNew = false; // 今回釣った魚が図鑑に初登録か
+
+  const ZUKAN_TABS = [['small', '浅い'], ['medium', '中間'], ['large', '深い'], ['rare', '幻']];
+  const ZK_SCALE = { small: 0.85, medium: 0.9, large: 0.95 };
+  const DEPTH_LABEL = { small: '浅い海', medium: '中くらいの深さ', large: '深い海' };
+
+  // 魚の説明（図鑑で釣った魚をクリックすると表示）
+  const DESC = {
+    // --- 浅い ---
+    'イワシ': '群れをつくって泳ぐ小さな魚。海の食べ物のつながりを下から支える大切な存在で、大きな魚たちの大事なごちそうになる。',
+    'アジ': '沿岸に多い身近な魚。群れで回遊し、塩焼きやフライ、お刺身まで幅広く親しまれている。',
+    'フグ': '敵におそわれるとお腹をふくらませて身を守る。種類によっては強い毒をもつので、むやみに食べてはいけない。',
+    'キス': '砂地の浅い海にすむほっそりした魚。天ぷらの定番で、投げ釣りの人気ターゲット。',
+    'サバ': '青緑の背に波のような模様がある回遊魚。脂がのっていて、塩焼きやみそ煮で食べられる。',
+    'メバル': '岩場や海藻の間にすむ魚。大きな目が特徴で、暗くなると活発に動き出す。',
+    'サンマ': '細長い体の秋の味覚。群れで海を長く回遊し、塩焼きにすると脂が香ばしい。',
+    'ハゼ': '河口や浅い砂泥の海にすむ魚。釣りの入門魚として親しまれ、天ぷらにするとおいしい。',
+    'シラス': 'イワシの仲間の子ども。体が透き通っていて、ゆでたり干したりして食べられる。',
+    'カマス': '鋭い歯をもつ細長い魚。小魚を見つけると素早く追いかけて捕まえる。',
+    'サヨリ': '下あごが細く長くとがった、すらりとした魚。水面近くを群れて泳ぐ。',
+    'ボラ': '河口や港にも入ってくる丈夫な魚。成長するにつれて呼び名が変わる出世魚として知られる。',
+    'ニシン': '冷たい海に大群ですむ魚。卵は「数の子」として、お正月料理に使われる。',
+    'イカナゴ': '砂にもぐって暮らす小さな魚。春に獲れる稚魚は「くぎ煮」にして食べられる。',
+    'ハコフグ': 'かたい骨の板で体が箱のようにおおわれている。ゆっくり泳ぎ、とぼけた顔が人気者。',
+    'ミノカサゴ': '蓑のように広がる大きなひれが特徴。ひれのトゲに毒があるので、触らないよう注意。',
+    'クマノミ': 'イソギンチャクと助け合って暮らす。毒のある触手に守られながら、卵も近くで育てる。',
+    'ネンブツダイ': '岩場やほら穴の近くに群れる赤っぽい小魚。オスが口の中で卵を守って育てる。',
+    'カワハギ': '皮がはがれやすいことが名前の由来。肝がおいしく、薄づくりの刺身は人気の味。',
+    'イシモチ': '頭の中にとても大きな石のような骨（耳石）をもつ。釣り上げるとグーグーと鳴く。',
+    'ベラ': 'カラフルな色の種類が多く、岩場のまわりを泳ぐ。昼に活動して、夜は眠る。',
+    'スズメダイ': 'サンゴ礁や岩場で群れる小さな魚。小さいけれど、自分の縄張りを守る気が強い。',
+    'キンギョハナダイ': 'サンゴ礁の上で大きな群れをつくる。オレンジやピンクの鮮やかな体が海中で目立つ。',
+    'ハタンポ': '暗い岩かげに群れる魚。大きな目をいかして、夜に小さな生き物を食べに出かける。',
+    'アイゴ': '背びれなどのトゲに毒をもつ。ふだんは海藻を食べておとなしく暮らしている。',
+    'ギンポ': '細長い体で岩のすき間にひそむ魚。天ぷらにするととてもおいしい。',
+    'ダツ': '針のようにとがった長い口をもつ。光に向かって勢いよく飛び出すことがある。',
+    'トビウオ': '大きな胸びれを広げて、海面の上を滑るように飛ぶ。敵から逃げるための技。',
+    'チョウチョウウオ': '蝶のようにひらひらと泳ぐ、サンゴ礁の人気者。細い口で小さな生き物をつまんで食べる。',
+    'ニザダイ': '尾の付け根に鋭い突起をもつ。岩場で海藻をもぐもぐ食べて暮らしている。',
+    // --- 中間 ---
+    'マダイ': '桜色のきれいな体で、「めでたい」に通じるお祝いの魚。昔から日本で愛されてきた。',
+    'カサゴ': '岩場にひそんで獲物を待つ根魚。ヒレのトゲに注意。みそ汁や煮つけがおいしい。',
+    'カレイ': '海底に体を伏せて砂にまぎれる。生まれたときは普通の魚の形で、成長すると目が片側に寄る。',
+    'スズキ': '河口にも入ってくる力強い魚。成長するにつれて呼び名が変わる出世魚のひとつ。',
+    'ウツボ': '岩のすき間にひそむ細長い魚。するどい歯をもっていて、見た目はこわいが味は上々。',
+    'ヒラメ': '砂の上でじっとして、近づく小魚を待ちぶせる。両目は体の左側にそろっている。',
+    'ブダイ': 'サンゴ礁にすみ、鳥のくちばしのような歯でサンゴや海藻をかじる。',
+    'イシダイ': 'しま模様が美しく、「磯の王者」とよばれる。強いあごで貝やウニもかみくだく。',
+    'クロダイ': '港や河口の近くにもすむ。何でもよく食べる雑食で、釣り人に人気が高い。',
+    'ホウボウ': '大きな胸びれを広げて海底を歩くように進む。ぐぐっと音を出して鳴くこともある。',
+    'アカハタ': 'サンゴ礁や岩場にすむハタの仲間。赤い体に小さな斑点がちりばめられている。',
+    'キンメダイ': '深い海にすみ、金色に光る大きな目をもつ。暗い海のなかで光を集めるためといわれる。',
+    'アマダイ': '砂や泥の海底に巣穴をほって暮らす。上品な味で、高級魚として知られる。',
+    'ムツ': '深い海にすむ脂ののった魚。煮つけにすると身がやわらかくておいしい。',
+    'イサキ': '子どものころは体にしまがある。初夏においしくなり、梅雨イサキともよばれる。',
+    'ハマチ': 'ブリの若い魚の呼び名のひとつ。ブリよりもあっさりした味わい。',
+    'カツオ': '群れで海を速く泳ぎまわる。止まると息ができないので、泳ぎ続けて生きる。',
+    'サワラ': '春を告げる魚として知られ、漢字では「鰆」と書く。するどい歯をもつ速い泳ぎ手。',
+    'タチウオ': '銀色にかがやく細長い体。海中で頭を上にして、立ち泳ぎのように浮かぶ。',
+    'アナゴ': '昼は砂や岩の間にかくれ、夜になると動き出す。すしや天ぷらでおなじみ。',
+    'ハモ': '細長い体にするどい歯をもつ。骨が多いが、骨切りをして夏の味覚として食べられる。',
+    'メジナ': '磯でよく釣れる魚。引きが強く、釣り人をわくわくさせる相手。',
+    'ハタ': '岩場にすむどっしりした魚。大きく育つ種類もいて、高級魚として人気がある。',
+    'マダラ': '冷たい海にすむ大きな口の魚。鍋物のたねとして冬に親しまれている。',
+    'アイナメ': '岩場にすむ魚。産卵のころは、オスが卵のそばについてしっかり守る。',
+    'ソイ': 'カサゴに近い仲間の根魚。岩場にすみ、煮つけや唐揚げがおいしい。',
+    'コチ': '平たい頭で海底に張りつき、砂にもぐって獲物をまちぶせる。夏においしい魚。',
+    'オコゼ': '見た目はごつごつして地味だが、背びれに毒をもつ。身は高級な味といわれる。',
+    'ヘダイ': 'クロダイに近い仲間。やや銀色がかっていて、岩場や浅い海で暮らす。',
+    'シマアジ': '体の側面にうっすらしまが入った、アジの仲間の高級魚。脂がのっておいしい。',
+    // --- 深い ---
+    'マグロ': '大海原を休みなく泳ぎ続ける。高速で泳ぐために、体は流線形をしている。',
+    'サメ': '大昔から姿をあまり変えずに生きてきた。骨は硬い骨ではなく、やわらかい軟骨でできている。',
+    'カジキ': '槍のように長くとがった上あごをもつ。泳ぎの速さは海のなかでもトップクラス。',
+    'ブリ': '成長につれて呼び名が変わる出世魚。冬に脂がのった「寒ブリ」は特においしい。',
+    'エイ': '平たい体をひらひらさせて泳ぐ。じつはサメと同じ仲間で、骨は軟骨でできている。',
+    'シュモクザメ': 'ハンマーのようなT字の頭をもつ。左右に広がった目で、広い範囲を見渡せる。',
+    'クロマグロ': 'マグロの仲間でもとくに大きくなる。何千キロもの海を渡って回遊する。',
+    'キハダ': 'ひれが黄色いのが名前の由来。世界中の暖かい海を泳ぎまわる。',
+    'メバチ': '大きな目が名前の由来。深い海にも潜って、えさをさがす。',
+    'カンパチ': '頭に「八」の字に見える模様がある。力が強く、釣り人に人気の大物。',
+    'ヒラマサ': 'ブリによく似ているが、体はやや平たい。引きがとても強く、釣り人あこがれの魚。',
+    'バショウカジキ': '大きな背びれが、芭蕉の葉の帆のように広がる。カジキのなかでも特に泳ぎが速い。',
+    'メカジキ': '長い剣のような吻をもつ。大人になると歯が生えなくなり、うろこもなくなる。',
+    'マカジキ': '体にうっすらとしま模様が出る。群れのなかの小魚を、長い吻で打ちはらって食べる。',
+    'ホホジロザメ': '大型の肉食ザメ。鋭い歯と強い力をもち、海の頂点にいる存在のひとつ。',
+    'ジンベエザメ': '世界でいちばん大きな魚。大きな口をあけて、プランクトンをこして食べるおとなしい性格。',
+    'ヨシキリザメ': '体が青く細長いサメ。外洋を大きく回遊して暮らす。',
+    'トラフザメ': '体に虎のような模様や斑点がある。海底でじっとして、貝やカニを食べる。',
+    'ノコギリザメ': 'のこぎりのように突き出した吻をもつ。吻を左右にふって、獲物をさがす。',
+    'マンタ': '横に大きく広がるひれをもつ。ひらりと泳ぎながら、プランクトンを口に集めて食べる。',
+    'アカエイ': '尾に毒のトゲをもつ。ふだんは海底の砂にもぐって、じっとしている。',
+    'トビエイ': '泳ぎながら水面から飛び上がることがある。貝をかみくだく強い歯をもつ。',
+    'シイラ': '鮮やかな緑色をした力強い魚。ハワイでは「マヒマヒ」とよばれ、親しまれている。',
+    'ロウニンアジ': 'アジの仲間でもっとも大きくなる。力強く泳ぎ、サンゴ礁の王者といわれる。',
+    'ターポン': '大きなうろこをもつ銀色の魚。水面で空気を吸って、息をすることができる。',
+    'オヒョウ': '世界でも最大級のカレイの仲間。冷たい海の底で、どっしりと暮らしている。',
+    'チョウザメ': '大昔から姿が変わらない「生きた化石」。卵は高級食材のキャビアとして有名。',
+    'ウバザメ': 'とても大きな口をあけて、ゆったりとプランクトンを食べる。人をおそうことはない。',
+    'リュウグウノツカイ': '銀色の細長い体をもつ深海の魚。めったに姿を見られず、竜宮城の使いと名づけられた。',
+    'シロカジキ': '大型のカジキの仲間。力が強く、釣り人にとって夢の大物のひとつ。',
+    // --- 幻 ---
+    '黄金のアジ': '浅い海にときどき現れるという幻のアジ。金色に輝く体は、見ただけで幸運が訪れるといわれる。',
+    '黄金のマダイ': '中ほどの深さにひそむ幻のマダイ。お祝いの魚が金色になった、おめでたさ極まる姿。',
+    '黄金のマグロ': '深い海の底で光るという伝説のマグロ。釣り上げた者は、海の王者とたたえられる。',
+  };
+  let zukanTab = 'small';
+  function zukanList(tab) {
+    if (tab === 'rare') return ['small', 'medium', 'large'].map(k => ({ kind: k, sp: RARES[k], rare: true }));
+    return SPECIES[tab].map(sp => ({ kind: tab, sp, rare: false }));
+  }
+  function zukanAll() { return ZUKAN_TABS.flatMap(([t]) => zukanList(t)); }
+  function zukanTotal() { return zukanAll().length; }
+  function zukanGot() { return zukanAll().filter(e => zukan[e.sp.name] > 0).length; }
+
+  // ---- BGM ----
+  // 外部の音声ファイルは使わず、ブラウザの音声合成（Web Audio）でその場で演奏する。
+  //   calm … 魚を待っているとき（ゆったり・波の音つき）
+  //   fish … 魚がヒットして引き上げているとき（テンポが速く、盛り上がる）
+  const Music = (() => {
+    const KEY = 'umitsuri_bgm';
+    const VOL = 0.55;
+    let ac = null, master = null, noiseBuf = null, timer = null;
+    let enabled = true;
+    try { enabled = localStorage.getItem(KEY) !== '0'; } catch (e) {}
+    let want = null, cur = null; // 流したいBGM / 今流しているBGM
+    const runners = [];          // 演奏中のBGM（フェードアウト中も含む）
+
+    const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+
+    function ensure() {
+      if (!ac) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return false;
+        ac = new AC();
+        master = ac.createGain();
+        master.gain.value = enabled ? VOL : 0;
+        const comp = ac.createDynamicsCompressor(); // 音がはみ出さないように
+        master.connect(comp); comp.connect(ac.destination);
+        noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); // 波の音・ハイハット用のノイズ
+        const d = noiseBuf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        timer = setInterval(tick, 25);
+      }
+      if (ac.state === 'suspended') ac.resume();
+      return true;
+    }
+
+    // --- 音の部品 ---
+    function tone(dest, t, freq, dur, type, vol, o = {}) { // 持続する音
+      const osc = ac.createOscillator();
+      osc.type = type; osc.frequency.setValueAtTime(freq, t);
+      if (o.detune) osc.detune.value = o.detune;
+      const g = ac.createGain();
+      const a = o.attack || 0.01, r = o.release || 0.08;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(vol, t + a);
+      g.gain.setValueAtTime(vol, Math.max(t + a, t + dur));
+      g.gain.linearRampToValueAtTime(0.0001, t + dur + r);
+      if (o.lp) {
+        const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp;
+        osc.connect(f); f.connect(g);
+      } else osc.connect(g);
+      g.connect(dest);
+      osc.start(t); osc.stop(t + dur + r + 0.05);
+    }
+    function pluck(dest, t, freq, dur, vol, type) { // はじいて、すっと消える音（オルゴール風）
+      const osc = ac.createOscillator();
+      osc.type = type || 'sine'; osc.frequency.value = freq;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(vol, t + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.connect(g); g.connect(dest);
+      osc.start(t); osc.stop(t + dur + 0.05);
+    }
+    function noise(dest, t, dur, vol, type, freq, q) { // シャッ・ザッという音
+      const src = ac.createBufferSource(); src.buffer = noiseBuf;
+      const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q || 0.7;
+      const g = ac.createGain();
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(f); f.connect(g); g.connect(dest);
+      src.start(t, Math.random() * 1.5); src.stop(t + dur + 0.02);
+    }
+    function kick(dest, t, vol) {
+      const osc = ac.createOscillator(); osc.type = 'sine';
+      osc.frequency.setValueAtTime(150, t); osc.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+      osc.connect(g); g.connect(dest); osc.start(t); osc.stop(t + 0.25);
+    }
+
+    // --- 効果音（BGMとは別に、マスター音量に直接つなぐ）---
+    function sweep(t, dur, f0, f1, vol, q) { // ヒュッという風切り音
+      const src = ac.createBufferSource(); src.buffer = noiseBuf;
+      const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = q || 1.2;
+      f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(vol, t + dur * 0.3);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(f); f.connect(g); g.connect(master);
+      src.start(t, Math.random() * 1.5); src.stop(t + dur + 0.05);
+    }
+    function splash(t, vol) { // ざぶん
+      noise(master, t, 0.45, vol, 'lowpass', 1400, 0.6);
+      noise(master, t, 0.25, vol * 0.6, 'highpass', 3500, 0.7);
+      pluck(master, t, 180, 0.25, vol * 0.5, 'sine');
+    }
+    const SFX = {
+      tick() { const t = ac.currentTime; pluck(master, t, 880, 0.08, 0.14, 'triangle'); },       // 投げる準備（クリック）
+      cast() { // 竿を振って、ルアーが海に落ちる
+        const t = ac.currentTime;
+        sweep(t, 0.32, 500, 3000, 0.5, 1.5);
+        splash(t + 0.34, 0.28);
+      },
+      catch() { // 釣れた！ 明るい上昇アルペジオ
+        const t = ac.currentTime;
+        splash(t, 0.22);
+        [72, 76, 79, 84].forEach((n, i) => {
+          pluck(master, t + 0.1 + i * 0.09, mtof(n), 0.5, 0.17, 'triangle');
+          pluck(master, t + 0.1 + i * 0.09, mtof(n + 12), 0.35, 0.05, 'sine');
+        });
+        [72, 76, 79, 84].forEach(n => tone(master, t + 0.5, mtof(n), 0.35, 'triangle', 0.05, { release: 0.4 }));
+      },
+      rare() { // 幻の魚：豪華なファンファーレ
+        const t = ac.currentTime;
+        splash(t, 0.25);
+        [67, 72, 76, 79, 84, 88, 91, 96].forEach((n, i) => {
+          pluck(master, t + 0.08 + i * 0.075, mtof(n), 0.6, 0.15, 'triangle');
+          pluck(master, t + 0.08 + i * 0.075, mtof(n + 12), 0.4, 0.045, 'sine');
+        });
+        [60, 64, 67, 72, 76].forEach(n => tone(master, t + 0.72, mtof(n), 0.7, 'sawtooth', 0.03, { lp: 2400, release: 0.6 }));
+        for (let i = 0; i < 6; i++) pluck(master, t + 0.75 + i * 0.07, mtof(100 + (i % 3) * 2), 0.2, 0.04, 'sine'); // きらきら
+      },
+      miss() { // 逃げられた…（下がっていく音）
+        const t = ac.currentTime;
+        noise(master, t, 0.18, 0.12, 'lowpass', 900, 0.6);
+        [67, 64, 60, 55].forEach((n, i) => {
+          tone(master, t + 0.05 + i * 0.2, mtof(n), i === 3 ? 0.55 : 0.16, 'triangle', 0.16, { lp: 1200, attack: 0.02, release: 0.12 });
+        });
+      },
+    };
+
+    // --- calm：魚を待っているときの、ゆったりしたBGM（ハ長調・テンポ70）---
+    const CALM = {
+      bpm: 70, len: 128, // 16分音符128個 = 8小節
+      chords: [[48, 52, 55], [45, 48, 52], [41, 45, 48], [43, 47, 50]], // C Am F G
+      roots: [36, 33, 29, 31],
+      melody: [ // 各小節の [何拍目(16分単位), 音]
+        [[0, 76], [6, 74], [8, 72], [12, 74]], [[0, 72], [4, 76], [8, 81], [12, 76]],
+        [[0, 81], [6, 79], [8, 76], [12, 79]], [[0, 79], [4, 76], [8, 74], [12, 72]],
+        [[0, 84], [6, 81], [8, 79], [12, 76]], [[0, 81], [4, 79], [8, 76], [12, 72]],
+        [[0, 76], [4, 79], [8, 81], [12, 84]], [[0, 83], [6, 79], [8, 74], [12, 79]],
+      ],
+      start(bus) { // 打ち寄せる波の音
+        const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+        const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+        const g = ac.createGain(); g.gain.value = 0.05;
+        const lfo = ac.createOscillator(); lfo.frequency.value = 0.11;
+        const lg = ac.createGain(); lg.gain.value = 0.035;
+        lfo.connect(lg); lg.connect(g.gain);
+        src.connect(lp); lp.connect(g); g.connect(bus);
+        src.start(); lfo.start();
+        return () => { try { src.stop(); lfo.stop(); } catch (e) {} };
+      },
+      step(i, t, bus) {
+        const bar = Math.floor(i / 16) % 8, s = i % 16, ch = bar % 4;
+        const sd = 60 / this.bpm / 4, chord = this.chords[ch];
+        if (s === 0) { // パッド（ふんわり持続する和音）
+          chord.forEach(n => {
+            tone(bus, t, mtof(n + 12), sd * 16, 'sine', 0.042, { attack: 0.9, release: 1.4 });
+            tone(bus, t, mtof(n + 12), sd * 16, 'triangle', 0.016, { attack: 1.1, release: 1.4, detune: 7 });
+          });
+        }
+        if (s === 0 || s === 8) tone(bus, t, mtof(this.roots[ch]), sd * 6, 'sine', 0.12, { attack: 0.02, release: 0.6 });
+        if (s % 2 === 0) { // アルペジオ
+          const k = [0, 2, 1, 2, 0, 2, 1, 2][s / 2];
+          pluck(bus, t, mtof(chord[k] + 24), 0.55, 0.03, 'triangle');
+        }
+        this.melody[bar].forEach(([ms, n]) => { // メロディ
+          if (ms === s) {
+            pluck(bus, t, mtof(n), 1.1, 0.05, 'sine');
+            pluck(bus, t, mtof(n + 12), 0.6, 0.012, 'sine');
+          }
+        });
+      },
+    };
+
+    // --- fish：ヒットして引き上げているときの、速くて盛り上がるBGM（イ短調・テンポ140）---
+    const FISH = {
+      bpm: 140, len: 128,
+      chords: [[69, 72, 76], [65, 69, 72], [67, 71, 74], [64, 67, 71]], // Am F G Em
+      roots: [45, 41, 43, 40],
+      intro(bus, t) { // ヒットした瞬間の「ジャン！」
+        [57, 60, 64, 69].forEach(n => tone(bus, t, mtof(n), 0.22, 'sawtooth', 0.045, { lp: 2600, release: 0.25 }));
+        noise(bus, t, 0.5, 0.1, 'highpass', 5000, 0.7);
+        kick(bus, t, 0.7);
+      },
+      step(i, t, bus) {
+        const bar = Math.floor(i / 16) % 8, s = i % 16, ch = bar % 4;
+        const sd = 60 / this.bpm / 4, chord = this.chords[ch], root = this.roots[ch];
+        if (s % 4 === 0) kick(bus, t, 0.5);
+        if (s === 4 || s === 12) { noise(bus, t, 0.13, 0.2, 'bandpass', 1800, 0.8); pluck(bus, t, 190, 0.1, 0.08, 'triangle'); }
+        if (s % 2 === 0) noise(bus, t, 0.05, s % 4 === 2 ? 0.1 : 0.05, 'highpass', 7000, 0.7);
+        if (s % 2 === 0) { // ベース（8分音符で走る）
+          tone(bus, t, mtof(s % 8 === 6 ? root + 12 : root), sd * 1.8, 'sawtooth', 0.085, { lp: 520, attack: 0.005, release: 0.05 });
+        }
+        if (s === 0 || s === 6 || s === 10) { // 和音のスタッカート
+          chord.forEach(n => tone(bus, t, mtof(n), sd * 1.5, 'sawtooth', 0.022, { lp: 2200, attack: 0.004, release: 0.05 }));
+        }
+        const up = bar >= 4 ? 12 : 0; // 後半は1オクターブ上がって盛り上がる
+        const note = chord[[0, 1, 2, 1][s % 4]] + up;
+        tone(bus, t, mtof(note), sd * 0.9, 'square', 0.02, { lp: 3200, attack: 0.003, release: 0.04 });
+      },
+    };
+    const TRACKS = { calm: CALM, fish: FISH };
+
+    // --- 再生の管理 ---
+    function startTrack(def) {
+      const now = ac.currentTime;
+      const bus = ac.createGain();
+      bus.gain.setValueAtTime(0.0001, now);
+      bus.gain.linearRampToValueAtTime(1, now + 0.35);
+      bus.connect(master);
+      const r = { def, bus, idx: 0, next: now + 0.06, stopAt: null, cleanup: def.start ? def.start(bus) : null };
+      if (def.intro) def.intro(bus, r.next);
+      runners.push(r);
+    }
+    function stopTrack(r, fade) {
+      const now = ac.currentTime;
+      r.bus.gain.cancelScheduledValues(now);
+      r.bus.gain.setValueAtTime(r.bus.gain.value, now);
+      r.bus.gain.linearRampToValueAtTime(0.0001, now + fade);
+      r.stopAt = now + fade + 0.1;
+    }
+    function tick() { // 少し先の音を、先回りして予約していく
+      if (!ac) return;
+      const now = ac.currentTime;
+      for (let k = runners.length - 1; k >= 0; k--) {
+        const r = runners[k];
+        if (r.stopAt) {
+          if (now > r.stopAt) { if (r.cleanup) r.cleanup(); r.bus.disconnect(); runners.splice(k, 1); }
+          continue;
+        }
+        const sd = 60 / r.def.bpm / 4;
+        if (r.next < now - 0.5) r.next = now + 0.05; // 長く止まっていたら、遅れを取り戻さず今から再開
+        while (r.next < now + 0.2) { r.def.step(r.idx % r.def.len, r.next, r.bus); r.next += sd; r.idx++; }
+      }
+    }
+    function apply() {
+      if (!ac || ac.state !== 'running' || want === cur) return;
+      runners.forEach(r => { if (!r.stopAt) stopTrack(r, 0.45); });
+      cur = want;
+      if (want) startTrack(TRACKS[want]);
+    }
+
+    return {
+      unlock() { ensure(); },                 // 画面をクリックしたときに呼ぶ（ブラウザの決まりで、音は操作の後でないと出せない）
+      mood(name) { want = name; apply(); },   // 流したいBGMを伝える（null なら止める）
+      toggle() {
+        ensure();
+        enabled = !enabled;
+        try { localStorage.setItem(KEY, enabled ? '1' : '0'); } catch (e) {}
+        if (ac) master.gain.setTargetAtTime(enabled ? VOL : 0, ac.currentTime, 0.05);
+        return enabled;
+      },
+      isOn() { return enabled; },
+      sfx(name) { if (ac && enabled && SFX[name]) { if (ac.state === 'suspended') ac.resume(); SFX[name](); } },
+      pause() { if (ac && ac.state === 'running') ac.suspend(); },
+      resume() { if (ac && ac.state === 'suspended') ac.resume(); },
+    };
+  })();
+
+  // ---- 状態 ----
+  let state = 'title';
+  let casts, score, caughtList, castNo;
+  let gaugePos, gaugeDir, gaugeSpeed;
+  let depth, hookY, targetY, sinkT;
+  let fishKind, species, fishX, fishY, waitT, waitTotal;
+  let zoneStart, zoneW;
+  let resultT, success, popup, shake;
+  let time = 0;
+
+  const bubbles = [];
+  function initBubbles() {
+    bubbles.length = 0;
+    for (let i = 0; i < 18; i++) {
+      bubbles.push({ x: Math.random() * W, y: WATER + Math.random() * (H - WATER), r: 1.5 + Math.random() * 3.5, sp: 18 + Math.random() * 30, ph: Math.random() * 6 });
+    }
+  }
+
+  const ambient = [];
+  function initAmbient() {
+    ambient.length = 0;
+    const spec = [
+      ['small', 3, 245, 295], ['medium', 3, 305, 350], ['large', 2, 358, 392],
+    ];
+    spec.forEach(([k, n, y0, y1]) => {
+      for (let i = 0; i < n; i++) {
+        ambient.push({
+          kind: k, sp: pickSpecies(k), x: Math.random() * W, y: y0 + Math.random() * (y1 - y0),
+          dir: Math.random() < 0.5 ? 1 : -1,
+          speed: (FISH[k].scale > 1 ? 14 : FISH[k].scale > 0.8 ? 24 : 34) + Math.random() * 12,
+        });
+      }
+    });
+  }
+
+  function resetGame() {
+    casts = MAX_CASTS; score = 0; caughtList = []; castNo = 0;
+    popup = null; shake = 0; hookY = WATER - 30;
+    state = 'ready';
+    initAmbient();
+    initBubbles();
+  }
+
+  // ---- 入力 ----
+  function onClick() {
+    Music.unlock();
+    if (state === 'ready') {
+      Music.sfx('tick');
+      castNo++;
+      gaugePos = 0; gaugeDir = 1; gaugeSpeed = 0.9;
+      state = 'depth';
+    } else if (state === 'depth') {
+      Music.sfx('cast');
+      depth = gaugePos;
+      fishKind = sizeFromDepth(depth);
+      species = pickSpecies(fishKind, true);
+      targetY = DEPTH_TOP + depth * DEPTH_RANGE;
+      sinkT = 0;
+      state = 'sink';
+    } else if (state === 'reel') {
+      const hit = gaugePos >= zoneStart && gaugePos <= zoneStart + zoneW;
+      success = hit;
+      resultT = 0;
+      Music.sfx(hit ? (species.rare ? 'rare' : 'catch') : 'miss');
+      if (hit) {
+        score += pointsOf();
+        caughtList.push({ kind: fishKind, sp: species });
+        isNew = !(zukan[species.name] > 0);
+        zukan[species.name] = (zukan[species.name] || 0) + 1;
+        saveZukan();
+        popup = { text: '+' + pointsOf(), t: 0 };
+      }
+      casts--;
+      state = 'result';
+    }
+  }
+  cv.addEventListener('mousedown', onClick);
+  cv.addEventListener('touchstart', e => { e.preventDefault(); onClick(); }, { passive: false });
+
+  document.getElementById('startBtn').onclick = () => {
+    Music.unlock();
+    document.getElementById('startScreen').classList.add('hidden');
+    resetGame();
+  };
+  document.getElementById('retryBtn').onclick = () => {
+    Music.unlock();
+    document.getElementById('resultScreen').classList.add('hidden');
+    resetGame();
+  };
+
+  // BGMのオン・オフ（ボタン／Mキー）と、画面を見ていないときの一時停止
+  const muteBtn = document.getElementById('muteBtn');
+  const showMute = () => { muteBtn.textContent = Music.isOn() ? '🔊' : '🔇'; };
+  muteBtn.onclick = () => { Music.toggle(); showMute(); };
+  document.addEventListener('keydown', e => {
+    if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey && !e.altKey) { Music.toggle(); showMute(); }
+  });
+  document.addEventListener('visibilitychange', () => { document.hidden ? Music.pause() : Music.resume(); });
+  showMute();
+  document.getElementById('zukanBtn1').onclick = () => openZukan();
+  document.getElementById('zukanBtn2').onclick = () => openZukan();
+  document.getElementById('zukanClose').onclick = () => {
+    document.getElementById('zukanScreen').classList.add('hidden');
+    document.getElementById('zukanDetail').classList.add('hidden');
+  };
+  document.getElementById('zdBack').onclick = () => {
+    document.getElementById('zukanDetail').classList.add('hidden');
+  };
+  document.getElementById('zukanReset').onclick = () => {
+    if (confirm('図鑑の記録をすべて消します。よろしいですか？')) {
+      zukan = {}; saveZukan(); renderZukan();
+    }
+  };
+
+  // ---- 更新 ----
+  function oscillate(dt) {
+    gaugePos += gaugeDir * gaugeSpeed * dt;
+    if (gaugePos >= 1) { gaugePos = 1; gaugeDir = -1; }
+    if (gaugePos <= 0) { gaugePos = 0; gaugeDir = 1; }
+  }
+
+  function update(dt) {
+    time += dt;
+    ambient.forEach(a => {
+      a.x += a.dir * a.speed * dt;
+      if (a.x > W + 80) a.x = -80;
+      if (a.x < -80) a.x = W + 80;
+    });
+    bubbles.forEach(b => {
+      b.y -= b.sp * dt;
+      b.x += Math.sin(time * 2 + b.ph) * 8 * dt;
+      if (b.y < WATER + 4) { b.y = H - 20; b.x = Math.random() * W; }
+    });
+    if (shake > 0) shake = Math.max(0, shake - dt);
+
+    if (state === 'depth') {
+      oscillate(dt);
+    } else if (state === 'sink') {
+      sinkT += dt;
+      const p = Math.min(1, sinkT / 1.1);
+      const e = 1 - Math.pow(1 - p, 2);
+      hookY = (WATER - 30) + (targetY - (WATER - 30)) * e;
+      if (p >= 1) {
+        waitTotal = 0.9 + Math.random() * 1.1; waitT = 0;
+        state = 'wait';
+      }
+    } else if (state === 'wait') {
+      waitT += dt;
+      const p = Math.min(1, waitT / waitTotal);
+      fishX = HOOK_X + 260 - 245 * p;
+      fishY = targetY + Math.sin(time * 6) * 3;
+      if (p >= 1) {
+        const f = FISH[fishKind];
+        zoneW = species.zone || f.zone;
+        zoneStart = 0.12 + Math.random() * (0.88 - 0.12 - zoneW);
+        gaugePos = 0; gaugeDir = 1; gaugeSpeed = species.speed || f.speed;
+        shake = 0.4;
+        state = 'reel';
+      }
+    } else if (state === 'reel') {
+      oscillate(dt);
+    } else if (state === 'result') {
+      resultT += dt;
+      if (success) {
+        const p = Math.min(1, resultT / 0.9);
+        hookY = targetY + ((WATER - 30) - targetY) * p;
+        fishX = HOOK_X + 15 * (1 - p) ; fishY = hookY;
+      } else {
+        fishX += 220 * dt; // 逃げる
+        hookY = Math.max(WATER - 30, hookY - 60 * dt);
+      }
+      if (popup) popup.t += dt;
+      if (resultT > 1.9) {
+        popup = null;
+        hookY = WATER - 30;
+        if (casts <= 0) finish(); else state = 'ready';
+      }
+    }
+  }
+
+  function finish() {
+    state = 'end';
+    document.getElementById('finalScore').textContent = score;
+    const gotRare = caughtList.some(c => c.sp.rare);
+    const rank = gotRare ? '★ 伝説の釣り人 ★' : score >= 60 ? '釣り名人！' : score >= 40 ? '釣り上手' : score >= 20 ? '釣り人見習い' : 'これから伸びるぞ！';
+    document.getElementById('rankText').textContent = rank;
+    const counts = {};
+    caughtList.forEach(c => { counts[c.sp.name] = (counts[c.sp.name] || 0) + 1; });
+    const names = Object.keys(counts).map(n => n + '×' + counts[n]);
+    document.getElementById('detailText').innerHTML =
+      '釣果：' + (names.length ? names.join('、') : 'なし') + '<br>' +
+      '（逃がした魚：' + (MAX_CASTS - caughtList.length) + ' 匹）<br>' +
+      '図鑑：' + zukanGot() + ' / ' + zukanTotal() + ' 種を登録済み';
+    document.getElementById('resultScreen').classList.remove('hidden');
+  }
+
+  // ---- 描画 ----
+  function tri(x1, y1, x2, y2, x3, y3) {
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.lineTo(x3, y3); ctx.closePath(); ctx.fill();
+  }
+  function ell(rx, ry, cx = 0, cy = 0) {
+    ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  function eye(x, y, r = 4) {
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#123'; ctx.beginPath(); ctx.arc(x + 1, y, r / 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.arc(x + 0.4, y - r * 0.35, r * 0.24, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 魚の基本形（平らな色塗り）。陰影つきの描画は下の drawFish が担当
+  function drawFishFlat(x, y, scale, color, dir, shape = 'normal', pat = null) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir * scale, scale);
+    ctx.fillStyle = color;
+    const belly = 'rgba(255,255,255,0.35)';
+    switch (shape) {
+      case 'slim': // イワシ・アジ
+        tri(-22, 0, -40, -11, -40, 11);
+        ell(28, 9);
+        tri(-6, -8, 4, -16, 12, -8);
+        ctx.fillStyle = belly; ctx.beginPath(); ctx.ellipse(2, 4, 22, 4, 0, 0, Math.PI); ctx.fill();
+        eye(18, -2, 3);
+        break;
+      case 'round': // フグ
+        tri(-16, 0, -30, -8, -30, 8);
+        ell(22, 19);
+        ctx.fillStyle = '#b8a040';
+        for (let a = -2; a <= 2; a++) tri(a * 9 - 3, -17, a * 9 + 3, -17, a * 9, -24);
+        ctx.fillStyle = belly; ctx.beginPath(); ctx.ellipse(0, 8, 16, 9, 0, 0, Math.PI); ctx.fill();
+        eye(12, -4, 4);
+        ctx.strokeStyle = '#b8603a'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(20, 4, 4, 0.3, 2.8); ctx.stroke();
+        break;
+      case 'spiky': // カサゴ
+        tri(-22, 0, -40, -14, -40, 14);
+        ell(28, 15);
+        for (let i = 0; i < 5; i++) tri(-16 + i * 7, -13, -12 + i * 7, -25, -8 + i * 7, -13);
+        ctx.fillStyle = belly; ctx.beginPath(); ctx.ellipse(2, 6, 20, 7, 0, 0, Math.PI); ctx.fill();
+        eye(15, -3);
+        break;
+      case 'flat': // カレイ
+        tri(-26, 0, -42, -10, -42, 10);
+        ell(30, 19);
+        ctx.fillStyle = 'rgba(120,80,40,0.45)';
+        [[-8, -4, 4], [6, 5, 3], [-16, 6, 3], [10, -8, 3]].forEach(([cx, cy, r]) => {
+          ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        });
+        ctx.fillStyle = color; tri(-10, -18, 4, -26, 14, -17);
+        eye(18, -6, 3.5); eye(11, -10, 3.5);
+        break;
+      case 'tuna': // マグロ
+        tri(-26, 0, -46, -18, -40, 0); tri(-26, 0, -46, 18, -40, 0);
+        ell(32, 14);
+        ctx.fillStyle = '#2c4a8a'; ell(30, 7, 0, -8);
+        ctx.fillStyle = '#f0d040';
+        for (let i = 0; i < 4; i++) tri(-22 + i * 5, -11, -19 + i * 5, -16, -17 + i * 5, -11);
+        ctx.fillStyle = color; tri(-2, -13, 8, -24, 14, -12);
+        ctx.fillStyle = belly; ctx.beginPath(); ctx.ellipse(2, 6, 24, 6, 0, 0, Math.PI); ctx.fill();
+        eye(20, -2, 3.5);
+        break;
+      case 'shark': // サメ
+        tri(-28, 0, -46, -20, -40, 0); tri(-28, 0, -40, 14, -36, 0);
+        ctx.beginPath(); ctx.moveTo(34, 2); ctx.quadraticCurveTo(20, -14, -28, -10);
+        ctx.lineTo(-28, 10); ctx.quadraticCurveTo(20, 14, 34, 2); ctx.fill();
+        tri(-6, -11, 8, -30, 16, -10);
+        ctx.fillStyle = '#e8eef2'; ctx.beginPath(); ctx.ellipse(6, 6, 24, 5, 0, 0, Math.PI); ctx.fill();
+        ctx.strokeStyle = '#345'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(14, 6); ctx.moveTo(18, 0); ctx.lineTo(18, 6); ctx.moveTo(22, 0); ctx.lineTo(22, 5); ctx.stroke();
+        eye(22, -3, 2.5);
+        break;
+      case 'marlin': // カジキ
+        tri(-26, 0, -44, -16, -40, 0); tri(-26, 0, -44, 16, -40, 0);
+        ell(28, 11);
+        ctx.fillStyle = '#c0c8d0'; tri(26, -2, 60, 0, 26, 3); // 吻
+        ctx.fillStyle = '#2a6fb0';
+        ctx.beginPath(); ctx.moveTo(-18, -9); ctx.quadraticCurveTo(0, -34, 18, -9); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = belly; ctx.beginPath(); ctx.ellipse(2, 5, 22, 5, 0, 0, Math.PI); ctx.fill();
+        eye(17, -2, 3);
+        break;
+      case 'eel': { // ウツボ
+        ctx.strokeStyle = color; ctx.lineWidth = 15; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.beginPath();
+        for (let px = -46; px <= 24; px += 4) {
+          const py = Math.sin(px * 0.14 + time * 6) * 5;
+          px === -46 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 4;
+        ctx.beginPath();
+        for (let px = -40; px <= 20; px += 4) {
+          const py = Math.sin(px * 0.14 + time * 6) * 5 - 3;
+          px === -40 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+        const hy = Math.sin(28 * 0.14 + time * 6) * 5;
+        ctx.fillStyle = color; ell(12, 9, 30, hy);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(38, hy + 3); ctx.lineTo(30, hy + 3); ctx.stroke();
+        eye(32, hy - 3, 3);
+        break;
+      }
+      case 'ray': // エイ
+        ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-24, 0); ctx.lineTo(-56, Math.sin(time * 5) * 4); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(36, 0); ctx.quadraticCurveTo(10, -34, -26, -4);
+        ctx.lineTo(-26, 4); ctx.quadraticCurveTo(10, 34, 36, 0); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.3)'; ell(16, 8, 4, 0);
+        ctx.fillStyle = '#123'; ctx.beginPath(); ctx.arc(22, -5, 2.5, 0, 7); ctx.arc(22, 5, 2.5, 0, 7); ctx.fill();
+        break;
+      case 'hammer': // シュモクザメ
+        tri(-28, 0, -46, -20, -40, 0); tri(-28, 0, -40, 14, -36, 0);
+        ctx.beginPath(); ctx.moveTo(28, 0); ctx.quadraticCurveTo(14, -14, -28, -10);
+        ctx.lineTo(-28, 10); ctx.quadraticCurveTo(14, 14, 28, 0); ctx.fill();
+        tri(-6, -11, 8, -30, 16, -10);
+        ctx.fillStyle = '#e8eef2'; ctx.beginPath(); ctx.ellipse(4, 6, 22, 5, 0, 0, Math.PI); ctx.fill();
+        ctx.fillStyle = color; ctx.fillRect(24, -16, 11, 32);
+        ctx.beginPath(); ctx.arc(29.5, -16, 5.5, 0, 7); ctx.arc(29.5, 16, 5.5, 0, 7); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(31, -17, 3, 0, 7); ctx.arc(31, 17, 3, 0, 7); ctx.fill();
+        ctx.fillStyle = '#123'; ctx.beginPath(); ctx.arc(32, -17, 1.5, 0, 7); ctx.arc(32, 17, 1.5, 0, 7); ctx.fill();
+        break;
+      default: // マダイ
+        tri(-22, 0, -40, -14, -40, 14);
+        ell(28, 15);
+        tri(-8, -13, 4, -23, 12, -12);
+        ctx.fillStyle = belly; ctx.beginPath(); ctx.ellipse(2, 6, 20, 7, 0, 0, Math.PI); ctx.fill();
+        eye(15, -3);
+    }
+    // 模様（しま・水玉）
+    if (pat && shape !== 'eel') {
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      if (pat === 'stripe') {
+        for (let i = 0; i < 4; i++) ctx.fillRect(-13 + i * 8, -7, 3, 14);
+      } else if (pat === 'spot') {
+        [[-14, -3], [-6, 3], [2, -4], [10, 2], [-2, 6], [14, -5]].forEach(([cx, cy]) => {
+          ctx.beginPath(); ctx.arc(cx, cy, 2.3, 0, Math.PI * 2); ctx.fill();
+        });
+      }
+    }
+    ctx.restore();
+  }
+
+  // ---- リアルな魚 ----
+  // 体の骨格（輪郭）にあわせて、ひれ・うろこ・エラ・目・口・模様を描き込み、
+  // 陰影をつけた画像にして使い回す
+  const SPR_W = 140, SPR_H = 90, SPR_OX = 72, SPR_OY = 45, SPR_S = 2;
+  const spriteCache = {};
+
+  // --- 色（元の色から、背・腹・ひれの色を作る） ---
+  function parseColor(c) {
+    const m = /^#([0-9a-f]{6})$/i.exec(c || '');
+    if (!m) return [128, 160, 200];
+    const n = parseInt(m[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function toHsl(rgb) {
+    const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    const l = (mx + mn) / 2;
+    let h = 0, s = 0;
+    if (mx !== mn) {
+      const d = mx - mn;
+      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h *= 60;
+    }
+    return [h, s * 100, l * 100];
+  }
+  const hsl = (h, s, l, a = 1) =>
+    'hsla(' + h.toFixed(0) + ',' + Math.max(0, Math.min(100, s)).toFixed(0) + '%,' +
+    Math.max(0, Math.min(100, l)).toFixed(0) + '%,' + a + ')';
+  function palette(color, S) {
+    const [h, s, l] = toHsl(parseColor(color));
+    const P = {
+      back: hsl(h, s * 1.05, l * 0.5), belly: hsl(h, s * 0.45, Math.min(94, l + 30)),
+      fin: hsl(h, s * 0.95, l * 0.82, 0.92), finTip: hsl(h, s * 0.9, l * 0.7, 0.5),
+      ray: hsl(h, s, l * 0.22, 0.42), spine: hsl(h, s, l * 0.2, 0.6), dark: hsl(h, s, l * 0.22),
+    };
+    if (S && S.fin) { P.fin = S.fin; P.finTip = S.fin; }
+    if (S && S.belly) P.belly = S.belly;
+    return P;
+  }
+  function hash(str) {
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return h;
+  }
+  function rng(seed) { // 魚ごとに毎回同じになる乱数（模様のばらつき用）
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // --- 形の道具 ---
+  function smooth(g, pts) { // 点をなめらかに結んだ閉じた輪郭
+    const n = pts.length;
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const m0 = mid(pts[n - 1], pts[0]);
+    g.beginPath(); g.moveTo(m0[0], m0[1]);
+    for (let i = 0; i < n; i++) {
+      const p = pts[i], m = mid(p, pts[(i + 1) % n]);
+      g.quadraticCurveTo(p[0], p[1], m[0], m[1]);
+    }
+    g.closePath();
+  }
+  function profY(arr, x) { // 輪郭のx位置でのy
+    const a = arr.slice().sort((p, q) => p[0] - q[0]);
+    if (x <= a[0][0]) return a[0][1];
+    for (let i = 1; i < a.length; i++) {
+      if (x <= a[i][0]) { const t = (x - a[i - 1][0]) / (a[i][0] - a[i - 1][0]); return a[i - 1][1] + (a[i][1] - a[i - 1][1]) * t; }
+    }
+    return a[a.length - 1][1];
+  }
+  function dot(g, x, y, r) { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); }
+
+  // --- 魚の体つき（head は +x 側）---
+  const FAM = {
+    normal: {
+      H: 20, scale: 3.4,
+      top: [[34, 1.5], [31, -4], [24, -10], [12, -15], [0, -15.5], [-12, -12], [-22, -6], [-30, -3.2]],
+      bot: [[-30, 3.2], [-22, 6], [-12, 11], [0, 14], [12, 13.5], [22, 9], [30, 4.5]],
+      tail: { x: -30, kind: 'fork', len: 17, h: 15 },
+      dorsal: [{ x1: 14, x0: -18, h: 11, kind: 'spiny' }], anal: [{ x1: -4, x0: -20, h: 7, kind: 'soft' }],
+      pelvic: { x: 6, h: 8 }, pect: { x: 15, y: 3, len: 12 },
+      eye: { x: 22, y: -4, r: 3.4 }, mouth: { x: 33, y: 2.6, len: 7 }, gill: 15, lateral: true,
+    },
+    slim: {
+      H: 20, scale: 3,
+      top: [[34, 1], [31, -3], [24, -7], [12, -9.5], [0, -10], [-12, -8], [-22, -5], [-30, -2.6]],
+      bot: [[-30, 2.6], [-22, 4.5], [-12, 7.5], [0, 9], [12, 8.5], [22, 5.5], [30, 3]],
+      tail: { x: -30, kind: 'fork', len: 15, h: 12 },
+      dorsal: [{ x1: 4, x0: -10, h: 7, kind: 'soft' }], anal: [{ x1: -12, x0: -24, h: 5, kind: 'soft' }],
+      pelvic: { x: 0, h: 5 }, pect: { x: 14, y: 3, len: 9 },
+      eye: { x: 21, y: -2.5, r: 2.8 }, mouth: { x: 33, y: 1.8, len: 6 }, gill: 15, lateral: true,
+    },
+    spiky: {
+      H: 20, scale: 3.6,
+      top: [[32, 0], [29, -6], [22, -12], [10, -16], [-2, -16], [-14, -12], [-24, -6], [-30, -3.5]],
+      bot: [[-30, 3.5], [-24, 6], [-14, 10], [-2, 13.5], [10, 14.5], [22, 10], [29, 5]],
+      tail: { x: -30, kind: 'round', len: 15, h: 13 },
+      dorsal: [{ x1: 20, x0: -6, h: 13, kind: 'spiny' }, { x1: -8, x0: -24, h: 9, kind: 'soft' }],
+      anal: [{ x1: -12, x0: -24, h: 7, kind: 'soft' }],
+      pelvic: { x: 8, h: 8 }, pect: { x: 13, y: 3, len: 15 },
+      eye: { x: 21, y: -5, r: 4 }, mouth: { x: 31, y: 3, len: 9 }, gill: 12, lateral: true,
+    },
+    tuna: {
+      H: 20, scale: 2.8, finlets: true,
+      top: [[36, 1], [32, -3.5], [24, -9], [10, -13.5], [-4, -14.5], [-16, -11], [-26, -6], [-34, -2.2]],
+      bot: [[-34, 2.2], [-26, 5.5], [-16, 10], [-4, 13], [10, 12.5], [24, 8], [32, 4]],
+      tail: { x: -34, kind: 'lunate', len: 15, h: 17 },
+      dorsal: [{ x1: 6, x0: -6, h: 12, kind: 'spiny' }, { x1: -12, x0: -18, h: 7, kind: 'soft' }],
+      anal: [{ x1: -14, x0: -20, h: 6, kind: 'soft' }],
+      pelvic: { x: 8, h: 7 }, pect: { x: 16, y: 4, len: 15 },
+      eye: { x: 24, y: -2.5, r: 3.2 }, mouth: { x: 35, y: 2.5, len: 8 }, gill: 17, lateral: true,
+    },
+    marlin: {
+      H: 20, scale: 2.8, bill: true,
+      top: [[36, 0.5], [33, -3], [26, -7.5], [12, -10.5], [0, -11], [-14, -9], [-24, -5], [-34, -2]],
+      bot: [[-34, 2], [-24, 5], [-14, 8.5], [0, 10.5], [12, 10], [26, 6.5], [33, 3]],
+      tail: { x: -34, kind: 'lunate', len: 14, h: 16 },
+      dorsal: [{ x1: 26, x0: -22, h: 15, kind: 'sail' }], anal: [{ x1: -12, x0: -22, h: 5, kind: 'soft' }],
+      pelvic: { x: 12, h: 6, long: true }, pect: { x: 20, y: 6, len: 15 },
+      eye: { x: 25, y: -3, r: 3.2 }, gill: 20, lateral: true,
+    },
+    round: { // フグ・ハコフグ
+      H: 20, scale: 3.2,
+      top: [[24, 0], [20, -9], [10, -16], [-2, -18.5], [-14, -14], [-22, -6], [-26, -2]],
+      bot: [[-26, 2], [-22, 6], [-14, 13], [-2, 17], [10, 15], [20, 8]],
+      tail: { x: -26, kind: 'round', len: 10, h: 9 },
+      dorsal: [{ x1: -8, x0: -18, h: 7, kind: 'soft' }], anal: [{ x1: -8, x0: -18, h: 7, kind: 'soft' }],
+      pect: { x: 8, y: 2, len: 9 },
+      eye: { x: 12, y: -6, r: 3.6 }, mouth: { x: 23, y: 2.4, len: 3 }, gill: 6,
+    },
+    disc: { // スズメダイ・チョウチョウウオ
+      H: 20, scale: 3.2,
+      top: [[24, 0], [20, -9], [10, -16], [-2, -18.5], [-14, -14], [-22, -6], [-26, -2]],
+      bot: [[-26, 2], [-22, 6], [-14, 13], [-2, 17], [10, 15], [20, 8]],
+      tail: { x: -26, kind: 'fork', len: 11, h: 12 },
+      dorsal: [{ x1: 12, x0: -18, h: 12, kind: 'spiny' }], anal: [{ x1: 4, x0: -16, h: 10, kind: 'soft' }],
+      pelvic: { x: 6, h: 9 }, pect: { x: 8, y: 2, len: 10 },
+      eye: { x: 14, y: -5, r: 3.6 }, mouth: { x: 23, y: 3, len: 4 }, gill: 7,
+    },
+    flat: { // カレイ・ヒラメ（目は片側に2つ）
+      H: 24, scale: 3.2,
+      top: [[30, 0], [24, -12], [10, -19], [-8, -20], [-22, -13], [-30, -3]],
+      bot: [[-30, 3], [-22, 13], [-8, 20], [10, 19], [24, 12]],
+      tail: { x: -30, kind: 'trunc', len: 9, h: 8 },
+      dorsal: [{ x1: 22, x0: -24, h: 5, kind: 'soft' }], anal: [{ x1: 18, x0: -24, h: 5, kind: 'soft' }],
+      pect: { x: 12, y: 0, len: 9 },
+      eye: { x: 21, y: -8, r: 3.2 }, eye2: { x: 15, y: -13, r: 3.2 }, mouth: { x: 29, y: 3, len: 6 }, gill: 10,
+    },
+  };
+
+  // --- 種類ごとの個性（模様・ひれの色など）。ここにない魚は色と乱数から自動でばらつきを出す ---
+  const SPEC = {
+    'マダイ': { marks: [{ t: 'dots', n: 18, x: [-14, 18], y: [-13, -2], r: [0.6, 1.1], c: 'rgba(70,150,255,0.9)' }], tailEdge: 'rgba(120,20,30,0.7)' },
+    'クマノミ': { marks: [{ t: 'bands', xs: [15, -2, -21], w: 3.6, c: 'rgba(255,255,255,0.95)', edge: 'rgba(0,0,0,0.7)' }], tailEdge: 'rgba(0,0,0,0.6)' },
+    'アジ': { marks: [{ t: 'hline', y: -1, w: 2.2, c: 'rgba(255,215,80,0.75)', x: [-26, 13] }, { t: 'spot', x: 14.5, y: -3, r: 2, c: 'rgba(10,20,40,0.65)' }] },
+    'シマアジ': { marks: [{ t: 'hline', y: -1, w: 2.4, c: 'rgba(255,215,80,0.7)', x: [-26, 13] }] },
+    'イワシ': { marks: [{ t: 'dots', n: 7, x: [-6, 12], y: [-2.4, -1.6], r: [0.8, 0.9], c: 'rgba(15,25,55,0.75)' }] },
+    'サバ': { marks: [{ t: 'zig', ys: [-8, -6, -4, -2], c: 'rgba(10,50,60,0.55)' }] },
+    'フグ': { belly: '#f6f6ee', marks: [{ t: 'dots', n: 20, x: [-14, 18], y: [-14, -1], r: [0.7, 1.6], c: 'rgba(40,30,10,0.55)' }] },
+    'ハコフグ': { marks: [{ t: 'dots', n: 16, x: [-16, 16], y: [-14, 6], r: [1, 1.7], c: 'rgba(30,25,10,0.6)' }] },
+    'イシダイ': { marks: [{ t: 'bands', xs: [18, 10, 2, -6, -14, -22], w: 2.2, c: 'rgba(15,20,30,0.78)' }] },
+    'カツオ': { marks: [{ t: 'hline', y: 4, w: 1, c: 'rgba(10,20,50,0.55)', x: [-24, 18] }, { t: 'hline', y: 6.5, w: 1, c: 'rgba(10,20,50,0.55)', x: [-24, 16] }, { t: 'hline', y: 9, w: 1, c: 'rgba(10,20,50,0.5)', x: [-22, 12] }] },
+    'キハダ': { fin: 'rgba(245,215,70,0.92)', marks: [{ t: 'hline', y: -2, w: 1.8, c: 'rgba(255,215,60,0.7)', x: [-30, 22] }] },
+    'ブリ': { marks: [{ t: 'hline', y: 1.5, w: 2.4, c: 'rgba(255,220,90,0.7)', x: [-30, 22] }] },
+    'ハマチ': { marks: [{ t: 'hline', y: 1.2, w: 2, c: 'rgba(255,220,90,0.65)', x: [-24, 20] }] },
+    'ヒラマサ': { marks: [{ t: 'hline', y: 1.2, w: 2.2, c: 'rgba(255,220,90,0.7)', x: [-30, 22] }] },
+    'ネンブツダイ': { marks: [{ t: 'hline', y: -1, w: 1.6, c: 'rgba(120,20,30,0.6)', x: [-26, 20] }] },
+    'マカジキ': { marks: [{ t: 'bands', xs: [14, 8, 2, -4, -10, -16, -22], w: 1.6, c: 'rgba(200,230,255,0.5)' }] },
+    'ミノカサゴ': { bigPect: 1.9 },
+    'トビウオ': { bigPect: 2.7 },
+    'ダツ': { beak: 14 },
+    'サヨリ': { beak: 9, beakDrop: 1.8, beakTip: '#e2503a' },
+    'カサゴ': { eye: '#e8b060' },
+  };
+
+  // --- ひれ ---
+  function drawFin(g, F, f, side, P, R) {
+    const n = Math.max(6, Math.round((f.x1 - f.x0) / 2.2));
+    const arr = side < 0 ? F.top : F.bot;
+    const tips = [], bases = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      const xb = f.x1 + (f.x0 - f.x1) * t;
+      const by = profY(arr, xb) - side * 0.8;
+      let hi;
+      if (f.kind === 'spiny') hi = t < 0.55 ? f.h * (0.92 - 0.1 * t) : f.h * 0.62 * (1 - (t - 0.55) * 0.5);
+      else if (f.kind === 'sail') hi = f.h * (0.4 + 0.6 * Math.sin(Math.PI * Math.pow(t, 0.7)));
+      else hi = f.h * (0.5 + 0.5 * Math.sin(Math.PI * (0.1 + 0.8 * t)));
+      const lean = f.kind === 'sail' ? -2 - t * 3 : (f.kind === 'spiny' && t < 0.55) ? -1 - t * 4 : -3 - t * 2;
+      bases.push([xb, by]); tips.push([xb + lean, by + side * hi]);
+    }
+    const mid = bases[Math.floor(n / 2)][1];
+    const gr = g.createLinearGradient(0, mid, 0, mid + side * f.h);
+    gr.addColorStop(0, P.fin); gr.addColorStop(1, P.finTip);
+    g.fillStyle = gr;
+    g.beginPath(); g.moveTo(bases[0][0], bases[0][1]); g.lineTo(tips[0][0], tips[0][1]);
+    for (let i = 1; i < n; i++) { // 膜はひれ条の間で少したるむ
+      const a = tips[i - 1], b = tips[i];
+      g.quadraticCurveTo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 - side * 1.4, b[0], b[1]);
+    }
+    g.lineTo(bases[n - 1][0], bases[n - 1][1]); g.closePath(); g.fill();
+    for (let i = 0; i < n; i++) { // ひれ条（硬いトゲは太く）
+      const stiff = f.kind === 'spiny' && i < n * 0.55;
+      g.strokeStyle = stiff ? P.spine : P.ray; g.lineWidth = stiff ? 0.9 : 0.5;
+      g.beginPath(); g.moveTo(bases[i][0], bases[i][1]); g.lineTo(tips[i][0], tips[i][1]); g.stroke();
+    }
+    if (f.kind === 'sail') { // 背びれの斑点
+      g.fillStyle = 'rgba(10,30,90,0.5)';
+      for (let i = 0; i < 12; i++) {
+        const t = 0.1 + R() * 0.8, x = f.x1 + (f.x0 - f.x1) * t;
+        const y = profY(arr, x) + side * (2 + R() * f.h * 0.55);
+        g.beginPath(); g.ellipse(x - 1.5, y, 0.9, 1.3, 0, 0, Math.PI * 2); g.fill();
+      }
+    }
+  }
+
+  function drawTail(g, T, P, S) {
+    const x = T.x, L = T.len, h = T.h, ph = 2.8;
+    g.beginPath(); g.moveTo(x + 3, -ph);
+    if (T.kind === 'round') {
+      g.quadraticCurveTo(x - L * 0.6, -h * 1.05, x - L, -h * 0.35);
+      g.quadraticCurveTo(x - L * 1.12, 0, x - L, h * 0.35);
+      g.quadraticCurveTo(x - L * 0.6, h * 1.05, x + 3, ph);
+    } else if (T.kind === 'trunc') {
+      g.quadraticCurveTo(x - L * 0.5, -h, x - L, -h * 0.9);
+      g.quadraticCurveTo(x - L * 0.9, 0, x - L, h * 0.9);
+      g.quadraticCurveTo(x - L * 0.5, h, x + 3, ph);
+    } else { // 二股の尾（マグロやカジキは三日月形）
+      const tipW = T.kind === 'lunate' ? 1.12 : 1, nx = T.kind === 'lunate' ? 0.32 : 0.55;
+      g.quadraticCurveTo(x - L * 0.45, -h * 0.95, x - L, -h * tipW);
+      g.quadraticCurveTo(x - L * (nx + 0.18), -h * 0.2, x - L * nx, 0);
+      g.quadraticCurveTo(x - L * (nx + 0.18), h * 0.2, x - L, h * tipW);
+      g.quadraticCurveTo(x - L * 0.45, h * 0.95, x + 3, ph);
+    }
+    g.closePath();
+    const gr = g.createLinearGradient(x, 0, x - L, 0);
+    gr.addColorStop(0, P.fin); gr.addColorStop(1, P.finTip);
+    g.fillStyle = gr; g.fill();
+    if (S && S.tailEdge) { g.strokeStyle = S.tailEdge; g.lineWidth = 1.2; g.stroke(); }
+    g.strokeStyle = P.ray; g.lineWidth = 0.5;
+    for (let i = 0; i <= 11; i++) {
+      const a = -1 + 2 * i / 11;
+      const ex = T.kind === 'round' ? x - L * (0.95 - 0.3 * a * a) : x - L * (T.kind === 'lunate' ? 0.35 + 0.65 * Math.abs(a) : 0.55 + 0.45 * Math.abs(a));
+      g.beginPath(); g.moveTo(x + 1, a * ph * 0.7); g.lineTo(ex, a * h * 0.95); g.stroke();
+    }
+  }
+
+  function drawFinlets(g, F) { // マグロ類の小さな黄色いひれ（小離鰭）
+    g.fillStyle = '#f2d23a'; g.strokeStyle = 'rgba(80,60,0,0.5)'; g.lineWidth = 0.4;
+    for (let x = -18; x > -34; x -= 3.3) {
+      [-1, 1].forEach(side => {
+        const by = profY(side < 0 ? F.top : F.bot, x) - side * 0.6;
+        g.beginPath(); g.moveTo(x + 1.4, by); g.lineTo(x - 1.6, by); g.lineTo(x - 2.8, by + side * 4); g.closePath(); g.fill(); g.stroke();
+      });
+    }
+  }
+
+  function drawPelvic(g, F, f, P) {
+    const by = profY(F.bot, f.x) - 1;
+    if (f.long) { // カジキの細長い腹びれ
+      g.strokeStyle = 'rgba(70,90,120,0.8)'; g.lineWidth = 0.9;
+      g.beginPath(); g.moveTo(f.x + 1, by); g.quadraticCurveTo(f.x - 4, by + 4, f.x - 11, by + 8); g.stroke();
+      return;
+    }
+    g.fillStyle = P.fin;
+    g.beginPath(); g.moveTo(f.x + 2.5, by); g.lineTo(f.x - 1.5, by); g.lineTo(f.x - 5, by + f.h); g.lineTo(f.x + 1, by + f.h * 0.85); g.closePath(); g.fill();
+    g.strokeStyle = P.ray; g.lineWidth = 0.5;
+    for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(f.x + 1 - i, by); g.lineTo(f.x - 4 + i * 2.2, by + f.h * 0.9); g.stroke(); }
+  }
+
+  function drawPect(g, f, P) { // 胸びれ：扇のようにひろがる
+    const n = 7;
+    const tips = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1), a = Math.PI * (0.9 - 0.27 * t), l = f.len * (0.78 + 0.22 * Math.sin(Math.PI * (0.2 + 0.6 * t)));
+      tips.push([f.x + Math.cos(a) * l, f.y + Math.sin(a) * l]);
+    }
+    g.fillStyle = P.fin;
+    g.beginPath(); g.moveTo(f.x + 1.2, f.y - 1.8);
+    tips.forEach(p => g.lineTo(p[0], p[1]));
+    g.lineTo(f.x - 0.6, f.y + 1.8); g.closePath(); g.fill();
+    g.strokeStyle = P.ray; g.lineWidth = 0.5;
+    tips.forEach(p => { g.beginPath(); g.moveTo(f.x, f.y); g.lineTo(p[0], p[1]); g.stroke(); });
+    g.strokeStyle = P.spine; g.lineWidth = 0.8;
+    g.beginPath(); g.moveTo(f.x + 1.2, f.y - 1.8); g.lineTo(tips[0][0], tips[0][1]); g.stroke();
+  }
+
+  // --- 目 ---
+  function drawEye(g, x, y, r, iris) {
+    g.fillStyle = 'rgba(0,0,0,0.6)'; dot(g, x, y, r + 0.8);
+    const gr = g.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r);
+    gr.addColorStop(0, '#fff6d0'); gr.addColorStop(0.45, iris); gr.addColorStop(1, '#5a3a10');
+    g.fillStyle = gr; dot(g, x, y, r);
+    g.fillStyle = '#05080c'; dot(g, x + r * 0.08, y, r * 0.55);
+    g.fillStyle = 'rgba(255,255,255,0.95)'; dot(g, x - r * 0.3, y - r * 0.34, r * 0.24);
+    g.fillStyle = 'rgba(255,255,255,0.6)'; dot(g, x + r * 0.25, y + r * 0.3, r * 0.11);
+  }
+
+  // --- 体の模様 ---
+  function drawMarks(g, shape, pat, name, P, R) {
+    const S = SPEC[name];
+    const vline = (x) => { g.beginPath(); g.moveTo(x - 1, -24); g.quadraticCurveTo(x + 2.5, 0, x - 1, 24); g.stroke(); };
+    if (S && S.marks) {
+      S.marks.forEach(m => {
+        g.fillStyle = m.c; g.strokeStyle = m.c;
+        if (m.t === 'dots') {
+          for (let i = 0; i < m.n; i++) {
+            dot(g, m.x[0] + R() * (m.x[1] - m.x[0]), m.y[0] + R() * (m.y[1] - m.y[0]), m.r[0] + R() * (m.r[1] - m.r[0]));
+          }
+        } else if (m.t === 'bands') {
+          m.xs.forEach(x => {
+            if (m.edge) { g.strokeStyle = m.edge; g.lineWidth = m.w + 1.8; vline(x); }
+            g.strokeStyle = m.c; g.lineWidth = m.w; vline(x);
+          });
+        } else if (m.t === 'hline') {
+          g.lineWidth = m.w; g.beginPath(); g.moveTo(m.x[0], m.y + 0.5); g.quadraticCurveTo((m.x[0] + m.x[1]) / 2, m.y - 1, m.x[1], m.y); g.stroke();
+        } else if (m.t === 'zig') {
+          g.lineWidth = 0.9;
+          m.ys.forEach((y0, k) => {
+            g.beginPath();
+            for (let x = -26; x <= 24; x += 2.5) { const y = y0 + ((Math.round(x / 2.5) + k) % 2 ? 1.1 : -1.1); x === -26 ? g.moveTo(x, y) : g.lineTo(x, y); }
+            g.stroke();
+          });
+        } else if (m.t === 'spot') {
+          dot(g, m.x, m.y, m.r);
+        }
+      });
+      return;
+    }
+    if (pat === 'stripe') {
+      g.strokeStyle = shape === 'marlin' ? 'rgba(200,230,255,0.4)' : 'rgba(10,15,30,0.42)'; g.lineWidth = 2.4;
+      for (let i = 0; i < 5; i++) vline(-18 + i * 8);
+    } else if (pat === 'spot') {
+      for (let i = 0; i < 18; i++) {
+        g.fillStyle = 'rgba(15,12,8,' + (0.3 + R() * 0.3).toFixed(2) + ')';
+        dot(g, -22 + R() * 44, -11 + R() * 19, 0.8 + R() * 1.5);
+      }
+    } else if (R() < 0.6) { // 模様のない魚にも、うっすらしたまだらを入れる
+      g.fillStyle = 'rgba(0,0,0,0.13)';
+      for (let i = 0; i < 9; i++) dot(g, -22 + R() * 44, -12 + R() * 8, 0.6 + R() * 1.1);
+    }
+  }
+
+  function drawScales(g, F) {
+    const sz = F.scale;
+    g.lineWidth = 0.55;
+    for (let row = 0, y = -18; y < 18; y += sz * 0.85, row++) {
+      for (let x = -34 + (row % 2) * sz / 2; x < 36; x += sz) {
+        g.strokeStyle = 'rgba(0,0,0,0.15)';
+        g.beginPath(); g.arc(x, y, sz * 0.62, Math.PI - 1.15, Math.PI + 1.15); g.stroke();
+        g.strokeStyle = 'rgba(255,255,255,0.12)';
+        g.beginPath(); g.arc(x - 0.35, y - 0.3, sz * 0.62, Math.PI - 1, Math.PI + 1); g.stroke();
+      }
+    }
+  }
+
+  // --- 硬骨魚（アジ・タイ・マグロなど）---
+  function drawBony(g, F, shape, color, pat, name) {
+    const S = SPEC[name] || {};
+    const P = palette(color, S);
+    const R = rng(hash(name + '|' + color + '|' + shape));
+    const pts = F.top.concat(F.bot);
+
+    if (F.bill) { // カジキの吻（体の後ろから伸びる）
+      const bg = g.createLinearGradient(0, -2, 0, 2);
+      bg.addColorStop(0, '#5d6878'); bg.addColorStop(1, '#a9b3c0');
+      g.fillStyle = bg;
+      g.beginPath(); g.moveTo(30, -2.2); g.lineTo(67, 0); g.lineTo(30, 2.6); g.closePath(); g.fill();
+    }
+    if (S.beak) { // ダツ・サヨリの細長いくちばし
+      const bl = S.beak, dy = S.beakDrop || 0;
+      g.fillStyle = '#c8d4dc';
+      g.beginPath(); g.moveTo(30, -0.8 + dy); g.lineTo(34 + bl, 0.6 + dy); g.lineTo(30, 2.4 + dy); g.closePath(); g.fill();
+      if (S.beakTip) {
+        g.fillStyle = S.beakTip;
+        g.beginPath(); g.moveTo(34 + bl - 5, 0 + dy); g.lineTo(34 + bl, 0.6 + dy); g.lineTo(34 + bl - 5, 1.4 + dy); g.closePath(); g.fill();
+      }
+    }
+    drawTail(g, F.tail, P, S);
+    (F.dorsal || []).forEach(f => drawFin(g, F, f, -1, P, R));
+    (F.anal || []).forEach(f => drawFin(g, F, f, 1, P, R));
+    if (F.finlets) drawFinlets(g, F);
+
+    // 体：背は暗く、腹は明るく
+    smooth(g, pts);
+    const gr = g.createLinearGradient(0, -F.H, 0, F.H);
+    gr.addColorStop(0, P.back); gr.addColorStop(0.32, color); gr.addColorStop(0.58, color);
+    gr.addColorStop(0.8, P.belly); gr.addColorStop(1, P.belly);
+    g.fillStyle = gr; g.fill();
+
+    g.save();
+    smooth(g, pts); g.clip();
+    drawMarks(g, shape, pat, name, P, R);
+    drawScales(g, F);
+    const sheen = g.createLinearGradient(0, -F.H * 0.7, 0, -F.H * 0.1);
+    sheen.addColorStop(0, 'rgba(255,255,255,0)'); sheen.addColorStop(0.55, 'rgba(255,255,255,0.26)'); sheen.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = sheen; g.fillRect(-40, -F.H * 0.7, 80, F.H * 0.6);
+    if (F.lateral) { // 側線
+      g.strokeStyle = 'rgba(0,0,0,0.3)'; g.lineWidth = 0.7; g.setLineDash([1.2, 1.2]);
+      g.beginPath();
+      for (let x = F.gill - 2; x >= F.tail.x + 2; x -= 2) { const y = profY(F.top, x) * 0.36; x === F.gill - 2 ? g.moveTo(x, y) : g.lineTo(x, y); }
+      g.stroke(); g.setLineDash([]);
+    }
+    smooth(g, pts); // 縁をすこし暗くして丸みを出す
+    g.lineWidth = 6; g.strokeStyle = 'rgba(0,10,30,0.2)'; g.stroke();
+    g.restore();
+
+    // 腹びれ・胸びれ
+    if (F.pelvic) drawPelvic(g, F, F.pelvic, P);
+    if (F.pect) drawPect(g, S.bigPect ? { x: F.pect.x, y: F.pect.y, len: F.pect.len * (S.bigPect === true ? 1.8 : S.bigPect) } : F.pect, P);
+
+    // エラぶた
+    const gry = Math.abs(profY(F.top, F.gill)) * 0.85;
+    g.strokeStyle = 'rgba(0,10,30,0.42)'; g.lineWidth = 1.1;
+    g.beginPath(); g.ellipse(F.gill + 2.5, 0.5, 5.5, gry, 0, Math.PI * 0.5 + 0.25, Math.PI * 1.5 - 0.25); g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.22)'; g.lineWidth = 0.8;
+    g.beginPath(); g.ellipse(F.gill + 3.8, 0.5, 5.5, gry * 0.9, 0, Math.PI * 0.5 + 0.35, Math.PI * 1.5 - 0.35); g.stroke();
+
+    // 口と鼻の穴
+    if (F.mouth) {
+      const m = F.mouth;
+      g.strokeStyle = 'rgba(20,8,10,0.75)'; g.lineWidth = 0.9;
+      g.beginPath(); g.moveTo(m.x, m.y - 0.6); g.quadraticCurveTo(m.x - m.len * 0.5, m.y + 1.4, m.x - m.len, m.y + 0.6); g.stroke();
+      g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 0.6;
+      g.beginPath(); g.moveTo(m.x, m.y + 0.2); g.quadraticCurveTo(m.x - m.len * 0.5, m.y + 2.2, m.x - m.len * 0.8, m.y + 1.5); g.stroke();
+      g.fillStyle = 'rgba(0,0,0,0.45)'; dot(g, m.x - 3.2, m.y - 3.8, 0.6);
+    }
+    // 目
+    drawEye(g, F.eye.x, F.eye.y, F.eye.r, S.eye || '#e9c35a');
+    if (F.eye2) drawEye(g, F.eye2.x, F.eye2.y, F.eye2.r, S.eye || '#e9c35a');
+  }
+
+  // --- サメ・シュモクザメ ---
+  function drawShark(g, shape, color, pat, name) {
+    const S = SPEC[name] || {};
+    const P = palette(color, S);
+    const R = rng(hash(name + '|' + color + '|' + shape));
+    const hammer = shape === 'hammer';
+    const top = hammer
+      ? [[28, 0], [22, -6], [8, -11], [-8, -11], [-22, -7], [-34, -3]]
+      : [[40, 1], [34, -3], [24, -8], [8, -12], [-8, -11], [-22, -7], [-34, -3]];
+    const bot = hammer
+      ? [[-34, 3], [-22, 6], [-8, 9], [8, 10], [20, 7], [26, 3]]
+      : [[-34, 3], [-22, 6], [-8, 9], [8, 10], [24, 7], [34, 3.5]];
+    const finG = g.createLinearGradient(0, -30, 0, 0);
+    finG.addColorStop(0, P.back); finG.addColorStop(1, color);
+
+    // 尾（上の葉が長い）
+    g.fillStyle = finG;
+    g.beginPath(); g.moveTo(-30, -2.5);
+    g.quadraticCurveTo(-42, -9, -58, -27); g.quadraticCurveTo(-48, -8, -45, 0);
+    g.quadraticCurveTo(-47, 6, -53, 14); g.quadraticCurveTo(-41, 7, -30, 3); g.closePath(); g.fill();
+    // 第二背びれ・尻びれ
+    g.beginPath(); g.moveTo(-21, -7); g.lineTo(-26, -15); g.lineTo(-30, -4.5); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(-22, 6); g.lineTo(-27, 12); g.lineTo(-30, 3); g.closePath(); g.fill();
+    // 第一背びれ
+    g.beginPath(); g.moveTo(12, -10.5); g.quadraticCurveTo(10, -22, 1, -32); g.quadraticCurveTo(0, -20, -6, -10); g.closePath(); g.fill();
+
+    // 体（背とお腹がくっきり分かれる）
+    smooth(g, top.concat(bot));
+    const gr = g.createLinearGradient(0, -13, 0, 13);
+    gr.addColorStop(0, P.back); gr.addColorStop(0.35, color); gr.addColorStop(0.56, color);
+    gr.addColorStop(0.62, '#edf2f5'); gr.addColorStop(1, '#f7fafb');
+    g.fillStyle = gr; g.fill();
+    g.save();
+    smooth(g, top.concat(bot)); g.clip();
+    if (pat === 'spot') {
+      const light = name === 'ジンベエザメ';
+      for (let i = 0; i < 26; i++) {
+        g.fillStyle = light ? 'rgba(255,255,255,0.8)' : 'rgba(40,30,10,' + (0.35 + R() * 0.3).toFixed(2) + ')';
+        dot(g, -30 + R() * 56, -10 + R() * 12, 0.8 + R() * 1.2);
+      }
+      if (light) { g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 0.8; for (let k = 0; k < 4; k++) { g.beginPath(); g.moveTo(-26 + k * 11, -12); g.lineTo(-26 + k * 11, 0); g.stroke(); } }
+    }
+    const sheen = g.createLinearGradient(0, -10, 0, -2);
+    sheen.addColorStop(0, 'rgba(255,255,255,0)'); sheen.addColorStop(0.5, 'rgba(255,255,255,0.22)'); sheen.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = sheen; g.fillRect(-40, -10, 80, 8);
+    smooth(g, top.concat(bot)); g.lineWidth = 6; g.strokeStyle = 'rgba(0,10,30,0.2)'; g.stroke();
+    g.restore();
+
+    // 胸びれ・腹びれ
+    g.fillStyle = finG;
+    g.beginPath(); g.moveTo(16, 5); g.quadraticCurveTo(10, 16, -4, 26); g.quadraticCurveTo(-2, 12, -4, 6); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(-8, 9); g.lineTo(-18, 15); g.lineTo(-17, 8); g.closePath(); g.fill();
+
+    const hx = hammer ? 27 : 38;
+    if (hammer) { // ハンマー形の頭
+      const hg = g.createLinearGradient(0, -17, 0, 17);
+      hg.addColorStop(0, P.back); hg.addColorStop(0.4, color); hg.addColorStop(0.6, '#edf2f5'); hg.addColorStop(1, '#f7fafb');
+      g.fillStyle = hg;
+      g.beginPath(); g.ellipse(27, 0, 4.6, 16.5, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(0,10,30,0.2)'; g.beginPath(); g.ellipse(25.5, 0, 2.6, 15, 0, 0, Math.PI * 2); g.fill();
+      [-1, 1].forEach(s => { g.fillStyle = '#05080c'; dot(g, 28.5, s * 15.2, 2.1); g.fillStyle = 'rgba(255,255,255,0.9)'; dot(g, 28, s * 15.2 - 0.8, 0.7); });
+    } else {
+      g.fillStyle = '#05080c'; dot(g, 27, -3, 1.8);
+      g.fillStyle = 'rgba(255,255,255,0.9)'; dot(g, 26.5, -3.7, 0.6);
+    }
+    // 口（歯）とエラあな
+    g.strokeStyle = 'rgba(10,15,25,0.75)'; g.lineWidth = 0.9;
+    g.beginPath(); g.moveTo(hx - 1, 3.6); g.quadraticCurveTo(hx - 8, 7.4, hx - 15, 5.4); g.stroke();
+    g.fillStyle = '#ffffff';
+    for (let i = 0; i < 5; i++) { const tx = hx - 4 - i * 2.4; g.beginPath(); g.moveTo(tx, 5.3 + i * 0.1); g.lineTo(tx - 1, 5.3 + i * 0.1); g.lineTo(tx - 0.5, 7); g.closePath(); g.fill(); }
+    g.strokeStyle = 'rgba(0,10,30,0.4)'; g.lineWidth = 0.9;
+    for (let i = 0; i < 5; i++) { const gx = (hammer ? 14 : 18) - i * 3; g.beginPath(); g.moveTo(gx, -6); g.quadraticCurveTo(gx - 1.5, -1, gx - 0.5, 4); g.stroke(); }
+  }
+
+  // --- エイ（上から見た姿）---
+  function drawRay(g, color, pat, name) {
+    const P = palette(color, SPEC[name]);
+    const R = rng(hash(name + '|' + color));
+    const tw = Math.sin(time * 5) * 4;
+    g.lineCap = 'round';
+    g.strokeStyle = P.back; // 先へいくほど細くなる尾
+    const tailPt = t => [(1 - t) * (1 - t) * -20 + 2 * (1 - t) * t * -40 + t * t * -62, 2 * (1 - t) * t * tw * 0.5 + t * t * tw];
+    for (let k = 0; k < 16; k++) {
+      const a = tailPt(k / 16), b = tailPt((k + 1) / 16);
+      g.lineWidth = 3.4 * (1 - k / 16) + 0.6;
+      g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+    }
+    const bp = tailPt(0.42);
+    g.fillStyle = P.dark; g.beginPath(); g.moveTo(bp[0] + 3, bp[1] - 1.4); g.lineTo(bp[0] - 7, bp[1] - 0.2); g.lineTo(bp[0] + 3, bp[1] + 1.4); g.closePath(); g.fill(); // 尾のトゲ
+
+    const wing = () => {
+      g.beginPath(); g.moveTo(36, 0); g.quadraticCurveTo(16, -36, -22, -7);
+      g.quadraticCurveTo(-27, 0, -22, 7); g.quadraticCurveTo(16, 36, 36, 0); g.closePath();
+    };
+    wing();
+    const gr = g.createRadialGradient(6, 0, 2, 4, 0, 40);
+    gr.addColorStop(0, P.belly); gr.addColorStop(0.45, color); gr.addColorStop(1, P.back);
+    g.fillStyle = gr; g.fill();
+    g.save(); wing(); g.clip();
+    g.strokeStyle = 'rgba(0,10,30,0.16)'; g.lineWidth = 0.6; // 胸びれの筋
+    for (let i = -7; i <= 7; i++) { g.beginPath(); g.moveTo(-12, i * 0.8); g.quadraticCurveTo(10, i * 3.4, 30 - Math.abs(i) * 2, i * 4.3); g.stroke(); }
+    if (pat === 'spot') {
+      for (let i = 0; i < 28; i++) {
+        g.fillStyle = 'rgba(255,255,255,' + (0.45 + R() * 0.3).toFixed(2) + ')';
+        dot(g, -18 + R() * 48, -22 + R() * 44, 0.7 + R() * 1.3);
+      }
+    }
+    g.fillStyle = 'rgba(255,255,255,0.16)'; g.beginPath(); g.ellipse(6, -2, 16, 6, 0, 0, Math.PI * 2); g.fill();
+    wing(); g.lineWidth = 6; g.strokeStyle = 'rgba(0,10,30,0.22)'; g.stroke();
+    g.restore();
+    [-1, 1].forEach(s => { // 目の盛り上がりと噴水孔
+      g.fillStyle = P.dark; g.beginPath(); g.ellipse(22, s * 5.6, 3.2, 3.2, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#e9c35a'; dot(g, 22.4, s * 5.6, 2.1);
+      g.fillStyle = '#05080c'; dot(g, 22.8, s * 5.6, 1.2);
+      g.fillStyle = 'rgba(255,255,255,0.9)'; dot(g, 22, s * 5.6 - 0.7, 0.5);
+      g.fillStyle = 'rgba(0,10,30,0.45)'; g.beginPath(); g.ellipse(14, s * 8, 2.1, 1.1, 0.3 * s, 0, Math.PI * 2); g.fill();
+    });
+  }
+
+  // --- ウナギ型（ウツボ・アナゴ・タチウオなど）---
+  const EEL = {
+    'ウツボ': { w: 15, head: 11, spots: true, jaw: true },
+    'ギンポ': { w: 8, head: 7 }, 'アナゴ': { w: 10, head: 8 }, 'ハモ': { w: 12, head: 10, jaw: true },
+    'タチウオ': { w: 12, head: 8, silver: true },
+    'リュウグウノツカイ': { w: 15, head: 10, silver: true, crest: '#e23a3a' },
+  };
+  function drawEel(g, color, pat, name) {
+    const E = EEL[name] || { w: 12, head: 9 };
+    const P = palette(color, SPEC[name]);
+    const R = rng(hash(name + '|' + color));
+    const pts = [];
+    for (let px = -46; px <= 24; px += 2) pts.push([px, Math.sin(px * 0.14 + time * 6) * 5]);
+    const N = pts.length;
+    const wAt = i => E.w * (0.16 + 0.84 * Math.sin(Math.min(1, (i / (N - 1)) * 1.4) * Math.PI / 2));
+    g.lineCap = 'round'; g.lineJoin = 'round';
+
+    // 背びれ（体の上を細長くおおう）
+    g.fillStyle = E.crest || P.fin;
+    g.beginPath();
+    for (let i = 0; i < N; i++) { const y = pts[i][1] - wAt(i) / 2 - (E.crest ? 7 : 3.4) * Math.min(1, i / 8); i === 0 ? g.moveTo(pts[i][0], y) : g.lineTo(pts[i][0], y); }
+    for (let i = N - 1; i >= 0; i--) g.lineTo(pts[i][0], pts[i][1] - wAt(i) / 2 + 0.5);
+    g.closePath(); g.fill();
+
+    const pass = (scale, dy, col) => {
+      g.strokeStyle = col;
+      for (let i = 0; i < N - 1; i++) {
+        g.lineWidth = wAt(i) * scale;
+        g.beginPath(); g.moveTo(pts[i][0], pts[i][1] + wAt(i) * dy); g.lineTo(pts[i + 1][0], pts[i + 1][1] + wAt(i + 1) * dy); g.stroke();
+      }
+    };
+    pass(1, 0, E.silver ? 'hsl(215,14%,60%)' : P.back);
+    pass(0.8, 0.02, E.silver ? 'hsl(210,16%,82%)' : color);
+    pass(0.36, 0.22, E.silver ? 'rgba(255,255,255,0.8)' : 'hsla(45,40%,80%,0.55)');
+    pass(0.12, -0.28, 'rgba(255,255,255,0.35)');
+    if (E.spots || pat === 'spot') {
+      for (let i = 4; i < N - 3; i += 3) {
+        g.fillStyle = 'rgba(30,20,5,' + (0.35 + R() * 0.3).toFixed(2) + ')';
+        dot(g, pts[i][0] + R() * 2 - 1, pts[i][1] + (R() - 0.5) * wAt(i) * 0.5, 0.9 + R() * 1.3);
+      }
+    }
+    // 頭
+    const hp = pts[N - 1], hw = wAt(N - 1);
+    const hx = hp[0] + E.head * 0.3, hy = hp[1];
+    const hg = g.createLinearGradient(0, hy - hw / 2, 0, hy + hw / 2);
+    hg.addColorStop(0, E.silver ? 'hsl(215,14%,60%)' : P.back); hg.addColorStop(0.45, E.silver ? 'hsl(210,16%,82%)' : color); hg.addColorStop(1, P.belly);
+    g.fillStyle = hg;
+    g.beginPath(); g.ellipse(hx, hy, E.head, hw * 0.55, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(15,8,5,0.75)'; g.lineWidth = 0.9; // 口
+    g.beginPath(); g.moveTo(hx + E.head - 0.5, hy + hw * 0.08); g.quadraticCurveTo(hx + E.head * 0.2, hy + hw * 0.3, hx - E.head * 0.5, hy + hw * 0.18); g.stroke();
+    if (E.jaw) { // するどい歯
+      g.fillStyle = '#fff';
+      for (let i = 0; i < 4; i++) { const tx = hx + E.head * 0.75 - i * 2.2; g.beginPath(); g.moveTo(tx, hy + hw * 0.12 + i * 0.12); g.lineTo(tx - 0.9, hy + hw * 0.12 + i * 0.12); g.lineTo(tx - 0.4, hy + hw * 0.12 + 1.8); g.closePath(); g.fill(); }
+    }
+    drawEye(g, hx + E.head * 0.32, hy - hw * 0.14, Math.max(1.8, E.head * 0.24), '#e9c35a');
+    g.fillStyle = 'rgba(0,0,0,0.5)'; dot(g, hx + E.head * 0.78, hy - hw * 0.25, 0.7);
+  }
+
+  function drawRealFish(g, shape, color, pat, name) {
+    g.lineJoin = 'round'; g.lineCap = 'round';
+    if (shape === 'eel') return drawEel(g, color, pat, name);
+    if (shape === 'ray') return drawRay(g, color, pat, name);
+    if (shape === 'shark' || shape === 'hammer') return drawShark(g, shape, color, pat, name);
+    let F = FAM[shape] || FAM.normal;
+    if (shape === 'round' && (name === 'スズメダイ' || name === 'チョウチョウウオ')) F = FAM.disc;
+    return drawBony(g, F, shape, color, pat, name);
+  }
+
+  function addOutline(c) {
+    const t = document.createElement('canvas');
+    t.width = c.width; t.height = c.height;
+    const tg = t.getContext('2d');
+    tg.drawImage(c, 0, 0);
+    tg.globalCompositeOperation = 'source-atop';
+    tg.fillStyle = 'rgba(8,28,60,0.7)';
+    tg.fillRect(0, 0, t.width, t.height);
+    const g = c.getContext('2d');
+    g.globalCompositeOperation = 'destination-over';
+    for (let a = 0; a < 8; a++) g.drawImage(t, Math.cos(a * Math.PI / 4) * 1.6, Math.sin(a * Math.PI / 4) * 1.6);
+    g.globalCompositeOperation = 'source-over';
+  }
+
+  function getSprite(color, shape, pat, name) {
+    // くねくね動く魚（ウツボ・エイ）だけ、動きの12コマ分を別々に用意する
+    const period = shape === 'eel' ? 1.0472 : shape === 'ray' ? 1.2566 : 0;
+    const frame = period ? Math.floor((time % period) / period * 12) : 0;
+    const key = color + '|' + shape + '|' + (pat || '') + '|' + (name || '') + '|' + frame;
+    if (spriteCache[key]) return spriteCache[key];
+
+    const c = document.createElement('canvas');
+    c.width = SPR_W * SPR_S; c.height = SPR_H * SPR_S;
+    const g = c.getContext('2d');
+    const prevCtx = ctx, prevTime = time;
+    ctx = g;
+    if (period) time = frame * period / 12;
+    try {
+      g.save();
+      g.scale(SPR_S, SPR_S);
+      g.translate(SPR_OX, SPR_OY);
+      drawRealFish(g, shape, color, pat, name);
+      g.restore();
+    } finally { ctx = prevCtx; time = prevTime; }
+    addOutline(c);
+    spriteCache[key] = c;
+    return c;
+  }
+
+  function drawFish(x, y, scale, color, dir, shape = 'normal', pat = null, name = '') {
+    const spr = getSprite(color, shape, pat, name);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(dir * scale, scale);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(spr, -SPR_OX, -SPR_OY, SPR_W, SPR_H);
+    ctx.restore();
+  }
+
+  // 別のキャンバス（図鑑カード）に魚を描く
+  function drawFishOn(g, x, y, scale, color, dir, shape, pat, name) {
+    const prev = ctx; ctx = g;
+    try { drawFish(x, y, scale, color, dir, shape, pat, name); } finally { ctx = prev; }
+  }
+
+  function renderZukan() {
+    document.getElementById('zukanCount').textContent = zukanGot() + ' / ' + zukanTotal();
+
+    const tabs = document.getElementById('zukanTabs');
+    tabs.innerHTML = '';
+    ZUKAN_TABS.forEach(([key, label]) => {
+      const list = zukanList(key);
+      const got = list.filter(e => zukan[e.sp.name] > 0).length;
+      const b = document.createElement('button');
+      b.textContent = label + ' ' + got + '/' + list.length;
+      if (key === zukanTab) b.className = 'active';
+      b.onclick = () => { zukanTab = key; renderZukan(); };
+      tabs.appendChild(b);
+    });
+
+    const grid = document.getElementById('zukanGrid');
+    grid.innerHTML = '';
+    grid.scrollTop = 0;
+    zukanList(zukanTab).forEach(({ kind, sp, rare }) => {
+      const have = zukan[sp.name] > 0;
+      const card = document.createElement('div');
+      card.className = 'zcard ' + (have ? 'got' : 'none') + (rare ? ' rare' : '');
+      card.onclick = () => openZukanDetail(kind, sp, rare, have);
+
+      const c = document.createElement('canvas');
+      c.width = 120; c.height = 72;
+      const g = c.getContext('2d');
+      drawFishOn(g, 56, 36, ZK_SCALE[kind], sp.color, 1, sp.shape, have ? sp.pat : null, sp.name);
+      if (!have) { // 未登録はシルエット表示
+        g.globalCompositeOperation = 'source-atop';
+        g.fillStyle = '#0d2f57';
+        g.fillRect(0, 0, c.width, c.height);
+      }
+      card.appendChild(c);
+
+      const n = document.createElement('div');
+      n.className = 'zn';
+      n.textContent = have ? sp.name : '？？？';
+      card.appendChild(n);
+
+      const sub = document.createElement('div');
+      sub.className = have ? 'zc' : '';
+      sub.textContent = have
+        ? FISH[kind].label + '・' + (sp.points || FISH[kind].points) + '点・' + zukan[sp.name] + '匹'
+        : '未登録';
+      card.appendChild(sub);
+
+      grid.appendChild(card);
+    });
+  }
+
+  // 魚の詳細（大きな絵と説明）
+  function openZukanDetail(kind, sp, rare, have) {
+    const box = document.getElementById('zukanDetail');
+    box.className = 'zdetail' + (rare ? ' rare' : '');
+
+    const c = document.getElementById('zdCanvas');
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, c.width, c.height);
+    drawFishOn(g, 140, 90, ZK_SCALE[kind] * 2.1, sp.color, 1, sp.shape, have ? sp.pat : null, sp.name);
+    if (!have) {
+      g.globalCompositeOperation = 'source-atop';
+      g.fillStyle = '#0d2f57';
+      g.fillRect(0, 0, c.width, c.height);
+      g.globalCompositeOperation = 'source-over';
+    }
+
+    document.getElementById('zdName').textContent = have ? sp.name : '？？？';
+
+    const tags = document.getElementById('zdTags');
+    tags.innerHTML = '';
+    const tagTexts = have
+      ? [DEPTH_LABEL[kind], (rare ? '幻' : FISH[kind].label + 'サイズ'), (sp.points || FISH[kind].points) + '点', zukan[sp.name] + '匹釣った']
+      : [DEPTH_LABEL[kind] + 'にいる', (rare ? '幻の魚' : FISH[kind].label + 'サイズ')];
+    tagTexts.forEach(t => {
+      const s = document.createElement('span');
+      s.textContent = t;
+      tags.appendChild(s);
+    });
+
+    document.getElementById('zdText').textContent = have
+      ? (DESC[sp.name] || '')
+      : 'まだ釣ったことがない魚。' + DEPTH_LABEL[kind] + 'をねらって釣り上げると、くわしい説明が見られるようになる。';
+  }
+
+  function openZukan() {
+    renderZukan();
+    document.getElementById('zukanScreen').classList.remove('hidden');
+  }
+
+  function rodTip() {
+    const sh = shake > 0 ? Math.sin(time * 60) * 3 * (shake / 0.4) : 0;
+    const bend = (state === 'reel') ? Math.sin(time * 14) * 2 : 0;
+    return { x: 345 + sh, y: 92 + sh + bend };
+  }
+
+  function drawScene() {
+    drawSky();
+
+    // 海（深さで青が濃くなる）
+    const sea = ctx.createLinearGradient(0, WATER, 0, H);
+    sea.addColorStop(0, '#5ab8f4'); sea.addColorStop(0.25, '#2a88d6');
+    sea.addColorStop(0.6, '#14589f'); sea.addColorStop(1, '#082a58');
+    ctx.fillStyle = sea; ctx.fillRect(0, WATER, W, H - WATER);
+
+    drawLightRays();
+    drawSeabed();
+    // 背景の魚（遠くにいる影）
+    ambient.forEach(a => drawFishFlat(a.x, a.y, FISH[a.kind].scale * 0.85, 'rgba(200,230,255,0.20)', a.dir, a.sp.shape));
+    drawBubbles();
+
+    drawBoatAndAngler();
+    drawLineAndHook();
+    drawSurface();
+  }
+
+  function drawSky() {
+    const sky = ctx.createLinearGradient(0, 0, 0, WATER);
+    sky.addColorStop(0, '#4f9fe6'); sky.addColorStop(0.7, '#a9d8f8'); sky.addColorStop(1, '#eaf6ff');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, WATER);
+
+    // 太陽（まわりに光のにじみ）
+    const sg = ctx.createRadialGradient(700, 66, 2, 700, 66, 150);
+    sg.addColorStop(0, 'rgba(255,255,235,1)'); sg.addColorStop(0.2, 'rgba(255,246,196,1)');
+    sg.addColorStop(0.24, 'rgba(255,240,170,0.5)'); sg.addColorStop(1, 'rgba(255,240,170,0)');
+    ctx.fillStyle = sg; ctx.fillRect(520, 0, 280, WATER);
+
+    // 遠くの島
+    ctx.fillStyle = 'rgba(108,148,190,0.55)';
+    ctx.beginPath(); ctx.moveTo(420, WATER); ctx.lineTo(455, 170); ctx.lineTo(485, 176); ctx.lineTo(530, 150);
+    ctx.lineTo(575, 172); ctx.lineTo(610, WATER); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(138,172,208,0.5)';
+    ctx.beginPath(); ctx.moveTo(610, WATER); ctx.lineTo(650, 176); ctx.lineTo(690, 168); ctx.lineTo(740, WATER); ctx.closePath(); ctx.fill();
+
+    // 水平線のもや
+    const hz = ctx.createLinearGradient(0, WATER - 40, 0, WATER);
+    hz.addColorStop(0, 'rgba(255,255,255,0)'); hz.addColorStop(1, 'rgba(255,255,255,0.55)');
+    ctx.fillStyle = hz; ctx.fillRect(0, WATER - 40, W, 40);
+
+    // 雲（ゆっくり流れる）
+    [[80, 52, 1.0, 5], [330, 34, 0.75, 3], [560, 78, 0.9, 4]].forEach(([x0, cy, s, v]) => {
+      const cx = ((x0 + time * v) % (W + 240)) - 120;
+      ctx.fillStyle = 'rgba(255,255,255,0.94)';
+      [[0, 0, 22], [26, 4, 18], [-26, 6, 16], [12, -10, 16], [-8, -8, 14]].forEach(([dx, dy, r]) => {
+        ctx.beginPath(); ctx.arc(cx + dx * s, cy + dy * s, r * s, 0, Math.PI * 2); ctx.fill();
+      });
+      ctx.fillStyle = 'rgba(165,192,228,0.30)';
+      ctx.beginPath(); ctx.ellipse(cx, cy + 14 * s, 38 * s, 6 * s, 0, 0, Math.PI * 2); ctx.fill();
+    });
+
+    // カモメ
+    [[250, 70, 0], [290, 52, 1.7]].forEach(([gx0, gy, ph]) => {
+      const gx = ((gx0 + time * 18 + ph * 40) % (W + 60)) - 30;
+      const fl = Math.sin(time * 6 + ph) * 3;
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(gx - 9, gy + fl); ctx.quadraticCurveTo(gx - 4, gy - 5, gx, gy);
+      ctx.quadraticCurveTo(gx + 4, gy - 5, gx + 9, gy + fl); ctx.stroke();
+    });
+  }
+
+  // 水面から差し込む光の筋
+  function drawLightRays() {
+    for (let i = 0; i < 6; i++) {
+      const x0 = 80 + i * 140 + Math.sin(time * 0.5 + i) * 18;
+      const g = ctx.createLinearGradient(x0, WATER, x0 - 70, H);
+      g.addColorStop(0, 'rgba(255,255,255,0.15)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(x0 - 16, WATER); ctx.lineTo(x0 + 22, WATER);
+      ctx.lineTo(x0 - 40, H); ctx.lineTo(x0 - 130, H); ctx.closePath(); ctx.fill();
+    }
+  }
+
+  // 海底（砂・岩・ゆれる海藻）
+  function drawSeabed() {
+    const base = H - 30;
+    const sand = ctx.createLinearGradient(0, base - 8, 0, H);
+    sand.addColorStop(0, '#b9a373'); sand.addColorStop(1, '#6e5f3c');
+    ctx.fillStyle = sand;
+    ctx.beginPath(); ctx.moveTo(0, H);
+    for (let x = 0; x <= W; x += 10) ctx.lineTo(x, base + Math.sin(x * 0.02) * 5 + Math.sin(x * 0.07) * 2);
+    ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+
+    // 岩
+    [[52, base + 4, 38, 17], [742, base + 6, 44, 20], [380, base + 10, 30, 12]].forEach(([rx, ry, w, h]) => {
+      const rg = ctx.createLinearGradient(0, ry - h, 0, ry + h);
+      rg.addColorStop(0, '#6d7b88'); rg.addColorStop(1, '#2e3a46');
+      ctx.fillStyle = rg; ctx.beginPath(); ctx.ellipse(rx, ry, w, h, 0, Math.PI, 0); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.beginPath(); ctx.ellipse(rx - w * 0.25, ry - h * 0.55, w * 0.4, h * 0.22, -0.2, 0, Math.PI * 2); ctx.fill();
+    });
+
+    // 海藻
+    [18, 70, 112, 300, 330, 560, 600, 690, 770].forEach((sx, i) => {
+      ctx.lineCap = 'round';
+      for (let k = 0; k < 3; k++) {
+        const hgt = 38 + ((i * 13 + k * 17) % 30);
+        const sway = Math.sin(time * 1.6 + i + k) * 7;
+        const x0 = sx + (k - 1) * 7;
+        ctx.strokeStyle = k === 1 ? '#2f9a62' : '#1f7a52'; ctx.lineWidth = 4 - k * 0.4;
+        ctx.beginPath(); ctx.moveTo(x0, base + 8);
+        ctx.quadraticCurveTo(x0 + sway * 0.4, base - hgt * 0.5, x0 + sway, base - hgt); ctx.stroke();
+      }
+    });
+  }
+
+  function drawBubbles() {
+    bubbles.forEach(b => {
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.beginPath(); ctx.arc(b.x - b.r * 0.3, b.y - b.r * 0.3, Math.max(0.6, b.r * 0.22), 0, Math.PI * 2); ctx.fill();
+    });
+  }
+
+  function waveY(x, k) {
+    return WATER + Math.sin(x * 0.04 + time * 2 + k) * 3 + Math.sin(x * 0.013 + time * 1.2 + k * 2) * 2;
+  }
+
+  // 水面（船底や釣り糸の水中部分を青くかすませ、波とさざ波を重ねる）
+  function drawSurface() {
+    const wg = ctx.createLinearGradient(0, WATER - 6, 0, WATER + 44);
+    wg.addColorStop(0, 'rgba(60,150,230,0.78)'); wg.addColorStop(1, 'rgba(60,150,230,0.28)');
+    ctx.fillStyle = wg;
+    ctx.beginPath(); ctx.moveTo(0, waveY(0, 0));
+    for (let x = 0; x <= W; x += 8) ctx.lineTo(x, waveY(x, 0));
+    ctx.lineTo(W, WATER + 44); ctx.lineTo(0, WATER + 44); ctx.closePath(); ctx.fill();
+
+    [[0, 'rgba(255,255,255,0.35)', 2, 0], [1.7, 'rgba(255,255,255,0.75)', 2.5, 2]].forEach(([k, col, lw, off]) => {
+      ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'butt'; ctx.beginPath();
+      for (let x = 0; x <= W; x += 6) { const y = waveY(x, k) + off; x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.stroke();
+    });
+
+    // 波頭のきらめき
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    for (let i = 0; i < 22; i++) {
+      const x = (i * 37 + time * 14) % W;
+      ctx.fillRect(x, waveY(x, 1.7) + 3, 6 + (i % 3) * 3, 1.5);
+    }
+
+    // 釣り糸が水に入る場所の波紋
+    if (hookY > WATER - 4) {
+      for (let i = 0; i < 3; i++) {
+        const p = (time * 0.8 + i / 3) % 1;
+        ctx.strokeStyle = 'rgba(255,255,255,' + (0.55 * (1 - p)).toFixed(3) + ')'; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(HOOK_X, WATER + 1, 6 + p * 34, 2 + p * 7, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+    }
+  }
+
+  function drawBoatAndAngler() {
+    const bob = Math.sin(time * 2) * 2;
+    ctx.save(); ctx.translate(0, bob);
+    // 船体（木の板・白いライン・ふち・浮き輪）
+    const hullPath = () => {
+      ctx.beginPath(); ctx.moveTo(108, 158); ctx.lineTo(352, 158); ctx.lineTo(322, 210); ctx.lineTo(143, 210); ctx.closePath();
+    };
+    const hg2 = ctx.createLinearGradient(0, 158, 0, 210);
+    hg2.addColorStop(0, '#c9683c'); hg2.addColorStop(1, '#7e3519');
+    hullPath(); ctx.fillStyle = hg2; ctx.fill();
+    ctx.save(); hullPath(); ctx.clip();
+    ctx.lineWidth = 1.2;
+    for (let yy = 170; yy < 210; yy += 9) {
+      ctx.strokeStyle = 'rgba(0,0,0,0.20)'; ctx.beginPath(); ctx.moveTo(100, yy); ctx.lineTo(360, yy); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.beginPath(); ctx.moveTo(100, yy + 1.2); ctx.lineTo(360, yy + 1.2); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.30)'; ctx.fillRect(100, 196, 260, 20);
+    ctx.restore();
+    ctx.fillStyle = '#f5f0e6'; ctx.fillRect(118, 166, 226, 5);
+    ctx.fillStyle = '#6e2f16'; ctx.fillRect(104, 154, 252, 6);
+    ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.fillRect(104, 154, 252, 1.5);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(176, 185, 9, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#e03a3a';
+    for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(176, 185, 9, k * Math.PI / 2, k * Math.PI / 2 + 0.8); ctx.stroke(); }
+    // 釣り人：脚とブーツ
+    ctx.fillStyle = '#2b3a55'; ctx.fillRect(240, 142, 10, 16); ctx.fillRect(254, 142, 10, 16);
+    ctx.fillStyle = '#1c2430'; ctx.fillRect(238, 156, 13, 6); ctx.fillRect(254, 156, 14, 6);
+    // 胴体（シャツとライフジャケット）
+    const shirt = ctx.createLinearGradient(238, 0, 266, 0);
+    shirt.addColorStop(0, '#2c62c8'); shirt.addColorStop(1, '#4a8af0');
+    ctx.fillStyle = shirt; ctx.fillRect(238, 100, 28, 46);
+    ctx.fillStyle = '#f2872a'; ctx.fillRect(240, 103, 24, 30);
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(251, 103, 2, 30);
+    ctx.fillStyle = '#c96a16'; ctx.fillRect(240, 120, 24, 2);
+    ctx.fillStyle = '#3b2a1e'; ctx.fillRect(238, 140, 28, 4);
+    // 首と顔
+    ctx.fillStyle = '#e8b98c'; ctx.fillRect(250, 94, 8, 8);
+    const face = ctx.createRadialGradient(251, 84, 2, 254, 88, 16);
+    face.addColorStop(0, '#fbdcb8'); face.addColorStop(1, '#e3b084');
+    ctx.fillStyle = face; ctx.beginPath(); ctx.arc(254, 88, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e3b084'; ctx.beginPath(); ctx.arc(241, 89, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#233'; ctx.beginPath(); ctx.arc(260, 87, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#5a3a22'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(257, 83.5); ctx.lineTo(263, 83); ctx.stroke();
+    ctx.strokeStyle = '#c98c66'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(265, 88); ctx.lineTo(268, 91); ctx.lineTo(265, 92); ctx.stroke();
+    ctx.strokeStyle = '#a0522d'; ctx.beginPath(); ctx.arc(259, 92, 3.5, 0.2, 1.3); ctx.stroke();
+    // バケットハット
+    ctx.fillStyle = '#d9b36a'; ctx.beginPath(); ctx.arc(254, 82, 14.5, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#b8914a'; ctx.beginPath(); ctx.ellipse(256, 82.5, 21, 4.2, -0.05, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#a07c3a'; ctx.fillRect(240, 79, 29, 2.5);
+    // 腕
+    const tip = rodTip();
+    const P0 = { x: 272, y: 122 }, P1 = { x: 310, y: 100 };
+    ctx.strokeStyle = '#2c62c8'; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(260, 108); ctx.lineTo(276, 120); ctx.stroke();
+    ctx.strokeStyle = '#e8b98c'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(276, 120); ctx.lineTo(284, 123); ctx.stroke();
+    // 竿（コルクのグリップ・先細りの竿・ガイド）とリール
+    ctx.strokeStyle = '#c9a25a'; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(266, 126); ctx.lineTo(280, 121); ctx.stroke();
+    const rodGrad = ctx.createLinearGradient(P0.x, P0.y, tip.x, tip.y);
+    rodGrad.addColorStop(0, '#3a2a1a'); rodGrad.addColorStop(1, '#8a6a42');
+    ctx.strokeStyle = rodGrad; ctx.lineWidth = 3.6;
+    ctx.beginPath(); ctx.moveTo(P0.x, P0.y); ctx.quadraticCurveTo(P1.x, P1.y, tip.x, tip.y); ctx.stroke();
+    ctx.fillStyle = '#9aa4b0'; ctx.beginPath(); ctx.arc(278, 130, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#c8d0d8'; ctx.beginPath(); ctx.arc(277, 129, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#5a6470'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(278, 130); ctx.lineTo(284, 134); ctx.stroke();
+    ctx.strokeStyle = '#d8d8d8'; ctx.lineWidth = 1;
+    [0.35, 0.6, 0.82].forEach(t => {
+      const gx = (1 - t) * (1 - t) * P0.x + 2 * (1 - t) * t * P1.x + t * t * tip.x;
+      const gy = (1 - t) * (1 - t) * P0.y + 2 * (1 - t) * t * P1.y + t * t * tip.y;
+      ctx.beginPath(); ctx.arc(gx, gy + 2, 2, 0, Math.PI * 2); ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  function drawLineAndHook() {
+    const bob = Math.sin(time * 2) * 2;
+    const tip = rodTip();
+    const tx = tip.x, ty = tip.y + bob;
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(tx, ty);
+    ctx.quadraticCurveTo((tx + HOOK_X) / 2 - 10, ty + 10, HOOK_X, hookY);
+    ctx.stroke();
+    // 針
+    ctx.strokeStyle = '#ddd'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(HOOK_X, hookY); ctx.lineTo(HOOK_X, hookY + 8);
+    ctx.arc(HOOK_X - 5, hookY + 8, 5, 0, Math.PI * 0.9); ctx.stroke();
+    // 浮き（水面にあるとき）
+    if (hookY <= WATER) {
+      ctx.fillStyle = '#ff4d4d'; ctx.beginPath(); ctx.arc(HOOK_X, WATER - 2, 5, 0, 7); ctx.fill();
+    }
+  }
+
+  function drawFishEvents() {
+    const sc = FISH[fishKind] ? FISH[fishKind].scale : 1;
+    const glow = ['wait', 'reel', 'result'].includes(state) && species.rare;
+    if (glow) { ctx.shadowColor = '#fff3a0'; ctx.shadowBlur = 24 + Math.sin(time * 8) * 8; }
+    if (state === 'wait') {
+      drawFish(fishX, fishY, sc, species.color, -1, species.shape, species.pat, species.name);
+    } else if (state === 'reel') {
+      const wob = Math.sin(time * 18) * 3;
+      drawFish(HOOK_X + 14, targetY + 6 + wob, sc, species.color, -1, species.shape, species.pat, species.name);
+    } else if (state === 'result') {
+      if (success) drawFish(HOOK_X + 14, hookY + 10, sc, species.color, -1, species.shape, species.pat, species.name);
+      else drawFish(fishX, fishY, sc, species.color, 1, species.shape, species.pat, species.name);
+    }
+    ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
+  }
+
+  function text(str, x, y, size, color, align = 'center', weight = 'bold') {
+    ctx.font = weight + ' ' + size + 'px "Hiragino Sans","Meiryo","Yu Gothic",sans-serif';
+    ctx.textAlign = align; ctx.fillStyle = color; ctx.fillText(str, x, y);
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+
+  function drawHUD() {
+    ctx.fillStyle = 'rgba(8,40,90,0.55)';
+    roundRect(12, 12, 150, 40, 10); ctx.fill();
+    text('スコア ' + score, 24, 39, 20, '#fff', 'left');
+    ctx.fillStyle = 'rgba(8,40,90,0.55)'; // text() が塗り色を白にするので、右側の板の色を戻す
+    roundRect(W - 162, 12, 150, 40, 10); ctx.fill();
+    text('残り ' + casts + ' 投', W - 24, 39, 20, '#fff', 'right');
+    // 釣れた魚の履歴
+    caughtList.forEach((c, i) => drawFish(34 + i * 38, 76, FISH[c.kind].scale * 0.42, c.sp.color, 1, c.sp.shape, c.sp.pat, c.sp.name));
+  }
+
+  function drawGaugeFrame(label) {
+    const gx = 160, gy = 462, gw = 480, gh = 30;
+    ctx.fillStyle = 'rgba(8,40,90,0.7)';
+    roundRect(gx - 20, gy - 38, gw + 40, gh + 54, 14); ctx.fill();
+    text(label, W / 2, gy - 14, 17, '#fff');
+    return { gx, gy, gw, gh };
+  }
+
+  function drawDepthGauge() {
+    const { gx, gy, gw, gh } = drawGaugeFrame('クリックで狙う深さを決めよう（右ほど深い）');
+    const zones = [['small', 0, 0.40, '浅い：小'], ['medium', 0.40, 0.75, '中間：中'], ['large', 0.75, 1, '深い：大']];
+    zones.forEach(([k, a, b, lab]) => {
+      ctx.fillStyle = FISH[k].color;
+      ctx.globalAlpha = 0.85;
+      ctx.fillRect(gx + gw * a, gy, gw * (b - a), gh);
+      ctx.globalAlpha = 1;
+      text(lab, gx + gw * (a + b) / 2, gy + 21, 14, '#0a2a50');
+    });
+    drawMarker(gx + gw * gaugePos, gy, gh);
+  }
+
+  function drawReelGauge() {
+    const f = FISH[fishKind];
+    const { gx, gy, gw, gh } = drawGaugeFrame('ヒット！ 緑のゾーンでクリックして引き上げろ！（' + f.label + '）');
+    ctx.fillStyle = '#6b7f95'; ctx.fillRect(gx, gy, gw, gh);
+    ctx.fillStyle = '#3ddc84'; ctx.fillRect(gx + gw * zoneStart, gy, gw * zoneW, gh);
+    drawMarker(gx + gw * gaugePos, gy, gh);
+  }
+
+  function drawMarker(x, gy, gh) {
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(x - 3, gy - 6, 6, gh + 12);
+    ctx.strokeStyle = '#0a2a50'; ctx.lineWidth = 1; ctx.strokeRect(x - 3, gy - 6, 6, gh + 12);
+  }
+
+  function drawMessages() {
+    if (state === 'ready') {
+      text('第 ' + (castNo + 1) + ' 投目', W / 2, 250, 30, '#fff');
+      text('クリックで投げる準備', W / 2, 288, 20, '#e8f4ff');
+    } else if (state === 'depth') {
+      drawDepthGauge();
+    } else if (state === 'reel') {
+      drawReelGauge();
+      text('ヒット！', W / 2, 250, 38, '#ffe27a');
+    } else if (state === 'wait') {
+      text('…アタリを待っている', W / 2, 250, 22, '#e8f4ff');
+    } else if (state === 'result') {
+      if (success) {
+        const f = FISH[fishKind];
+        if (species.rare) {
+          text('★ 幻の魚！ ' + species.name + ' ゲット！ ★', W / 2, 250, 34, '#fff3a0');
+        } else {
+          text(species.name + '（' + f.label + '）ゲット！', W / 2, 250, 36, '#ffe27a');
+        }
+        if (isNew) text('NEW！ 図鑑に登録', W / 2, 284, 20, '#9affc8');
+        if (popup) text(popup.text, HOOK_X + 60, 150 - popup.t * 30, 34, '#fff');
+      } else {
+        text('逃げられた…', W / 2, 250, 36, '#ffd0d0');
+      }
+    }
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    drawScene();
+    drawFishEvents();
+    if (state !== 'title') { drawHUD(); drawMessages(); }
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    update(dt);
+    render();
+    // BGM：ヒットして引き上げ中だけ「fish」、それ以外のプレイ中は「calm」、タイトル・結果は無音
+    Music.mood(state === 'reel' ? 'fish' : (state === 'title' || state === 'end') ? null : 'calm');
+    requestAnimationFrame(loop);
+  }
+
+  species = SPECIES.small[0]; fishKind = 'small';
+  resetGame();
+  state = 'title';
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
